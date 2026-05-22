@@ -270,7 +270,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
 <div id="page-home" class="page active">
   <div class="hero">
     <div class="hero-bg-lines"></div>
-    <div class="hero-tag" data-i18n="hero_tag">Офіційний прогноз групи Football Stars</div>
+    <div class="hero-tag" data-i18n="hero_tag">Офіційний прогноз групи</div>
     <h1>WORLD<br><em>CUP</em> 2026</h1>
     <p class="hero-sub">USA · CANADA · MEXICO · 11 JUN – 19 JUL 2026</p>
     <div class="hero-stats">
@@ -278,6 +278,13 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       <div><div class="h-stat-val">104</div><div class="h-stat-lbl" data-i18n="matches">Матчів</div></div>
       <div><div class="h-stat-val" id="hs-players">0</div><div class="h-stat-lbl" data-i18n="participants">Учасників</div></div>
       <div><div class="h-stat-val" id="hs-played">0</div><div class="h-stat-lbl" data-i18n="played">Зіграно</div></div>
+    </div>
+  </div>
+  <div id="home-quote-block" style="margin-bottom:1rem;display:none">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;text-align:center;position:relative;overflow:hidden">
+      <div style="font-size:40px;color:var(--gold);opacity:.15;position:absolute;top:-8px;left:12px;font-family:serif;line-height:1">&ldquo;</div>
+      <div id="home-quote-text" style="font-size:14px;font-style:italic;color:var(--text);line-height:1.6;transition:opacity .5s ease;padding:0 1rem"></div>
+      <div id="home-quote-author" style="font-size:12px;color:var(--gold);margin-top:.5rem;font-weight:600;transition:opacity .5s ease"></div>
     </div>
   </div>
   <div class="grid-2">
@@ -935,6 +942,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
         <div class="ami" onclick="aTab('nomwinners',this)">🏆 <span data-i18n="nom_winners">Переможці номінацій</span></div>
         <div class="ami" onclick="aTab('visibility',this)">👁️ <span data-i18n="visibility">Видимість прогнозів</span></div>
         <div class="ami" onclick="aTab('pin',this)">🔑 <span data-i18n="change_pin">Змінити PIN</span></div>
+        <div class="ami" onclick="aTab('quotes',this)">💬 <span>Цитати</span></div>
         <div class="ami" onclick="aTab('backup',this)">💾 <span>Резервна копія</span></div>
       </div>
       <div class="apanel" id="apanel"></div>
@@ -1071,6 +1079,11 @@ let S=JSON.parse(localStorage.getItem(KEY)||'null')||{
   participants:['Микола','Макс','Денис','Оля','Ігор','Катя','Сашко'],
   scoring:{exact:3,result:1,diff:1,groupPts:1,goalDiff:1,place:1,r32:2,r16:4,r8:6,r4:8,final:10,champ:15},
   currency:{code:'UAH',rate:1},
+  quotes:[
+    {text:'Футбол — це не питання життя і смерті. Це набагато важливіше.',author:'Білл Шенклі'},
+    {text:'Успіх — це результат підготовки, наполегливої праці і вміння вчитися на помилках.',author:'Колін Пауелл'},
+    {text:'Переможець — це просто мрійник, який ніколи не здався.',author:'Нельсон Мандела'}
+  ],
   nominations:[
     {id:'topscorer',name:'Найкращий бомбардир',pts:5,winner:''},
     {id:'goldenball',name:'Гравець турніру (Golden Ball)',pts:5,winner:''},
@@ -1439,6 +1452,7 @@ function goPage(id,el){
 function renderHome(){
   lang=S.lang||'uk';applyI18n();
   document.getElementById('hs-players').textContent=S.participants.length;
+  initQuoteRotation();
   document.getElementById('hs-played').textContent=Object.values(S.matches).filter(m=>m.h!==''&&m.h!==undefined).length;
   const sorted=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
   document.getElementById('home-top3').innerHTML=sorted.slice(0,3).map((p,i)=>`
@@ -5225,7 +5239,7 @@ function aTab(tab,el){
   const renders={
     participants:aParts,scoring:aScoring,currency:aCurrency,nominations:aNoms,
     results:aResults,third:aThird,bonus:aBonus,
-    nomwinners:aNomWinners,visibility:aVisibility,pin:aPin,backup:aBackup
+    nomwinners:aNomWinners,visibility:aVisibility,pin:aPin,quotes:aQuotes,backup:aBackup
   };
   if(renders[tab])document.getElementById('apanel').innerHTML=renders[tab]();
 }
@@ -5929,6 +5943,83 @@ function saveBonusDeadline(){
 }
 function clearBonusDeadline(){S.bonusDeadline=null;save();aTab('visibility',document.querySelector('.ami.active'));toast('Дедлайн бонусу скинуто');}
 
+
+function aQuotes(){
+  const qs=S.quotes||[];
+  const rows=qs.map((q,i)=>`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <input type="text" id="qt-${i}" value="${escapeAttr(q.text)}" placeholder="Текст цитати" style="flex:1;padding:6px 8px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="qa-${i}" value="${escapeAttr(q.author)}" placeholder="Автор" style="flex:1;padding:6px 8px;font-size:13px">
+        <button class="btn btn-ghost btn-sm" style="color:#ff6b6b;border-color:rgba(255,107,107,.3)" onclick="delQuote(${i})">✕</button>
+      </div>
+    </div>`).join('');
+  return`<div class="apanel-title">Цитати на головній</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:1rem">Цитати змінюються кожні 5 секунд. Максимум 5 цитат.</p>
+    ${rows}
+    ${qs.length<5?`<button class="btn btn-ghost btn-sm" onclick="addQuote()" style="margin-bottom:1rem">+ Додати цитату</button>`:''}
+    <div style="margin-top:.5rem;display:flex;gap:10px;align-items:center">
+      <button class="btn btn-red btn-sm" onclick="saveQuotes()">Зберегти</button>
+      <span id="qtok" style="display:none" class="save-ok">✓</span>
+    </div>`;
+}
+function addQuote(){
+  if(!S.quotes)S.quotes=[];
+  if(S.quotes.length>=5)return;
+  S.quotes.push({text:'',author:''});
+  save();aTab('quotes',document.querySelector('.ami.active'));
+}
+function delQuote(i){
+  if(!S.quotes)return;
+  S.quotes.splice(i,1);
+  save();aTab('quotes',document.querySelector('.ami.active'));
+  toast('Цитату видалено');
+}
+function saveQuotes(){
+  if(!S.quotes)S.quotes=[];
+  S.quotes.forEach((q,i)=>{
+    const t=document.getElementById('qt-'+i);
+    const a=document.getElementById('qa-'+i);
+    if(t)q.text=t.value.trim();
+    if(a)q.author=a.value.trim();
+  });
+  S.quotes=S.quotes.filter(q=>q.text);
+  save();
+  document.getElementById('qtok').style.display='inline';
+  setTimeout(()=>document.getElementById('qtok').style.display='none',2000);
+  toast('Цитати збережено!');
+  initQuoteRotation();
+}
+
+let _quoteTimer=null;
+let _quoteIdx=0;
+function initQuoteRotation(){
+  const qs=(S.quotes||[]).filter(q=>q.text);
+  const block=document.getElementById('home-quote-block');
+  if(!block)return;
+  if(!qs.length){block.style.display='none';if(_quoteTimer)clearInterval(_quoteTimer);return;}
+  block.style.display='block';
+  _quoteIdx=0;
+  showQuote(qs,_quoteIdx);
+  if(_quoteTimer)clearInterval(_quoteTimer);
+  _quoteTimer=setInterval(()=>{
+    _quoteIdx=(_quoteIdx+1)%qs.length;
+    showQuote(qs,_quoteIdx);
+  },5000);
+}
+function showQuote(qs,idx){
+  const tEl=document.getElementById('home-quote-text');
+  const aEl=document.getElementById('home-quote-author');
+  if(!tEl||!aEl)return;
+  tEl.style.opacity='0';aEl.style.opacity='0';
+  setTimeout(()=>{
+    tEl.textContent=qs[idx].text;
+    aEl.textContent='— '+qs[idx].author;
+    tEl.style.opacity='1';aEl.style.opacity='1';
+  },500);
+}
 
 function aBackup(){
   var dataStr=JSON.stringify(S,null,2);

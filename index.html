@@ -1841,20 +1841,33 @@ function onPredUserChange(){
   if(!name){buildPredStageTabs();renderPredContent();return;}
 
   const pred=S.predictions[name]||{};
-  const hasPin=pred.pin&&pred.pin.length>0;
+  const hasLocalPin=pred.pin&&pred.pin.length>0;
 
-  if(hasPin&&unlockedUser!==name){
-    // Показуємо PIN-форму замість контенту
+  if(unlockedUser===name){
+    buildPredStageTabs();
+    renderPredContent();
+    return;
+  }
+
+  // Якщо PIN є локально — одразу показуємо форму вводу
+  if(hasLocalPin){
     renderPredPinForm(name);
     return;
   }
-  if(!hasPin&&unlockedUser!==name){
-    // PIN ще не встановлений — пропонуємо встановити
+
+  // Локального PIN немає — перевіряємо в Sheets чи він взагалі встановлений
+  sheetsGet({action:'checkPin', name, pin:'____'}).then(res=>{
+    if(res.ok && res.status==='not_set'){
+      // PIN не встановлений — пропонуємо встановити
+      renderPredSetPinForm(name);
+    } else {
+      // PIN є в Sheets (status='wrong' бо ми передали невалідний) — показуємо форму вводу
+      renderPredPinForm(name);
+    }
+  }).catch(()=>{
+    // Sheets недоступний — показуємо форму встановлення (найбезпечніший варіант)
     renderPredSetPinForm(name);
-    return;
-  }
-  buildPredStageTabs();
-  renderPredContent();
+  });
 }
 
 function renderPredPinForm(name){
@@ -1903,9 +1916,8 @@ function onUPinInput(i, name){
   if(el.value&&i<4) document.getElementById('upin'+(i+1))?.focus();
   if(el.value&&i===4){
     // автоматичний submit при заповненні останньої цифри
-    const pred=S.predictions[name]||{};
-    if(pred.pin) checkUserPin(name);
-    else setUserPin(name);
+    // checkUserPin сам розбирається чи є PIN локально чи ні
+    checkUserPin(name);
   }
 }
 
@@ -1922,17 +1934,49 @@ function getUPinValue(){
 function checkUserPin(name){
   const entered=getUPinValue();
   if(entered.length<4){toast('Введи 4 цифри');return;}
+
+  // Спочатку перевіряємо локально (швидко, працює офлайн)
   const pred=S.predictions[name]||{};
-  if(entered===pred.pin){
+  if(pred.pin && entered===pred.pin){
     unlockedUser=name;
     buildPredStageTabs();
     renderPredContent();
-  } else {
-    const err=document.getElementById('upin-err');
-    if(err){err.textContent='❌ Неправильний PIN';err.style.display='block';}
-    [1,2,3,4].forEach(i=>{const el=document.getElementById('upin'+i);if(el)el.value='';});
-    document.getElementById('upin1')?.focus();
+    return;
   }
+
+  // Якщо локально PIN немає (після завантаження з Sheets) — перевіряємо через Sheets
+  if(!pred.pin){
+    toast('⏳ Перевірка PIN...');
+    sheetsGet({action:'checkPin', name, pin:entered}).then(res=>{
+      if(res.ok && res.status==='ok'){
+        // Кешуємо PIN локально щоб наступний раз не йти в Sheets
+        if(!S.predictions[name])S.predictions[name]={};
+        S.predictions[name].pin=entered;
+        unlockedUser=name;
+        buildPredStageTabs();
+        renderPredContent();
+      } else if(res.ok && res.status==='not_set'){
+        // PIN ще не встановлений — показуємо форму встановлення
+        renderPredSetPinForm(name);
+      } else {
+        const err=document.getElementById('upin-err');
+        if(err){err.textContent='❌ Неправильний PIN';err.style.display='block';}
+        [1,2,3,4].forEach(i=>{const el=document.getElementById('upin'+i);if(el)el.value='';});
+        document.getElementById('upin1')?.focus();
+      }
+    }).catch(()=>{
+      // Sheets недоступний — показуємо помилку
+      const err=document.getElementById('upin-err');
+      if(err){err.textContent='❌ Не вдалось перевірити PIN. Спробуй ще раз.';err.style.display='block';}
+    });
+    return;
+  }
+
+  // PIN є локально але не збігається
+  const err=document.getElementById('upin-err');
+  if(err){err.textContent='❌ Неправильний PIN';err.style.display='block';}
+  [1,2,3,4].forEach(i=>{const el=document.getElementById('upin'+i);if(el)el.value='';});
+  document.getElementById('upin1')?.focus();
 }
 
 function setUserPin(name){

@@ -293,15 +293,286 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
     <h1 data-i18n="about_title">ЧС 2026 ПРОГНОЗИ</h1>
     <p data-i18n="about_sub">Змагайся з друзями — хто точніше передбачить результати Чемпіонату світу!</p>
   </div>
-  <div class="sec-title" data-i18n="features">Можливості</div>
-  <div class="feature-grid">
-    <div class="feature-card"><div class="feature-icon">⚽</div><div class="feature-title" data-i18n="f1t">Прогнози матчів</div><div class="feature-desc" data-i18n="f1d">Передбачай рахунки всіх 104 матчів — від групової стадії до фіналу</div></div>
-    <div class="feature-card"><div class="feature-icon">🏅</div><div class="feature-title" data-i18n="f2t">Номінації</div><div class="feature-desc" data-i18n="f2d">Вгадай найкращого бомбардира, гравця турніру та найкращого воротаря</div></div>
-    <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-title" data-i18n="f3t">Рейтинг в реальному часі</div><div class="feature-desc" data-i18n="f3d">Таблиця лідерів оновлюється після кожного матчу. Баланс у гривнях/євро/доларах</div></div>
-    <div class="feature-card"><div class="feature-icon">🔒</div><div class="feature-title" data-i18n="f4t">Приватні прогнози</div><div class="feature-desc" data-i18n="f4d">Прогнози закриті до старту — ніхто не може підглянути і скопіювати</div></div>
-    <div class="feature-card"><div class="feature-icon">🎯</div><div class="feature-title" data-i18n="f5t">Гнучкі правила</div><div class="feature-desc" data-i18n="f5d">Адмін налаштовує бали за кожну категорію і додає власні номінації</div></div>
-    <div class="feature-card"><div class="feature-icon">📱</div><div class="feature-title" data-i18n="f6t">Будь-який пристрій</div><div class="feature-desc" data-i18n="f6d">Відкривається на телефоні, планшеті і комп'ютері без встановлення</div></div>
+
+  <!-- ЗМІСТ -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+    <div style="font-weight:700;font-size:14px;color:var(--gold);margin-bottom:.75rem;letter-spacing:1px">ЗМІСТ</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+      <a href="#about-start" style="color:var(--text);text-decoration:none">1. Як розпочати</a>
+      <a href="#about-groups" style="color:var(--text);text-decoration:none">2. Групова стадія</a>
+      <a href="#about-playoff" style="color:var(--text);text-decoration:none">3. Плей-офф</a>
+      <a href="#about-noms" style="color:var(--text);text-decoration:none">4. Номінації</a>
+      <a href="#about-bonus" style="color:var(--text);text-decoration:none">5. Додатковий раунд</a>
+      <a href="#about-scoring" style="color:var(--text);text-decoration:none">6. Повна система балів</a>
+      <a href="#about-finance" style="color:var(--text);text-decoration:none">7. Фінансовий баланс</a>
+      <a href="#about-colors" style="color:var(--text);text-decoration:none">8. Кольорові позначення</a>
+      <a href="#about-faq" style="color:var(--text);text-decoration:none">9. Часті питання</a>
+    </div>
   </div>
+
+  <!-- 1. ЯК РОЗПОЧАТИ -->
+  <div id="about-start" class="sec-title">1. Як розпочати</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="min-width:32px;height:32px;border-radius:50%;background:var(--gold);color:#000;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px">1</div>
+        <div><div style="font-weight:700;margin-bottom:3px">Відкрий додаток у браузері</div><div style="font-size:13px;color:var(--muted)">Посилання надає адмін. Відкривай завжди в одному браузері — там зберігається кеш твоїх даних.</div></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="min-width:32px;height:32px;border-radius:50%;background:var(--gold);color:#000;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px">2</div>
+        <div><div style="font-weight:700;margin-bottom:3px">Обери своє ім'я</div><div style="font-size:13px;color:var(--muted)">Перейди на вкладку «Прогноз» і вибери своє ім'я зі списку. Список формує адмін.</div></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="min-width:32px;height:32px;border-radius:50%;background:var(--gold);color:#000;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px">3</div>
+        <div>
+          <div style="font-weight:700;margin-bottom:3px">🔑 Встанови PIN-код</div>
+          <div style="font-size:13px;color:var(--muted)">При першому вході тебе попросять встановити 4-значний PIN. Це захист щоб ніхто інший не міг редагувати твій прогноз.<br><br>
+          <span style="color:#ffd700">⚠️ Запам'ятай PIN — тільки ти його знаєш.</span> Якщо забудеш — адмін може скинути, але прогноз залишиться. При кожному наступному вході вводиш PIN щоб відкрити свій прогноз.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="min-width:32px;height:32px;border-radius:50%;background:var(--gold);color:#000;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px">4</div>
+        <div><div style="font-weight:700;margin-bottom:3px">Введи прогнози та збережи</div><div style="font-size:13px;color:var(--muted)">Заповни групову стадію → плей-офф → номінації. Натисни велику кнопку «ЗБЕРЕГТИ». Зелена галочка — прогноз збережено і синхронізовано.</div></div>
+      </div>
+    </div>
+    <div style="margin-top:1rem;padding:.75rem;background:rgba(255,215,0,.08);border-radius:8px;border-left:3px solid var(--gold);font-size:13px">
+      🔒 Значок «Прогнози приховані» — це нормально. Ти можеш вводити і зберігати прогноз. Просто інші учасники не бачать твоїх прогнозів до дедлайну.
+    </div>
+  </div>
+
+  <!-- 2. ГРУПОВА СТАДІЯ -->
+  <div id="about-groups" class="sec-title">2. Групова стадія</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <p>У турнірі <strong>48 команд у 12 групах</strong> по 4 команди. Кожна команда грає 3 матчі. З кожної групи проходять <strong>2 найкращі</strong>, плюс <strong>8 найкращих третіх місць</strong> з усіх 12 груп.</p>
+    <p style="margin-top:.75rem">Для кожного матчу вводиш рахунок — два числа від 0 до 20. Система автоматично будує таблицю твоєї групи і ранжує треті місця.</p>
+    <div style="margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px">
+      <div style="font-weight:700;margin-bottom:.5rem">🥉 Розподіл третіх місць</div>
+      Якщо за твоїм прогнозом кілька третіх місць мають однакові показники на межі 8-го місця — система підсвітить спірні команди. Ти сам обираєш хто проходить і натискаєш «Підтвердити вибір».<br><br>
+      Після вибору 8 третіх місць з'явиться блок де потрібно <strong>розподілити їх по матчах 1/16</strong> (як у реальному турнірі — кожне третє місце йде в конкретний матч залежно від групи).
+    </div>
+  </div>
+
+  <!-- 3. ПЛЕЙ-ОФФ -->
+  <div id="about-playoff" class="sec-title">3. Плей-офф</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <p>Пари плей-офф формуються <strong>автоматично</strong> з твоїх прогнозів групової стадії. Спочатку заповни всі 12 груп — тоді перейди на вкладку 1/16.</p>
+    <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem">
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">1/16</span><span>32 матчі. Вводиш рахунок основного часу.</span></div>
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">1/8</span><span>16 матчів.</span></div>
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">1/4</span><span>8 матчів.</span></div>
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">1/2</span><span>4 матчі.</span></div>
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">За 3-є</span><span>Матч між переможеними у півфіналі.</span></div>
+      <div style="display:flex;gap:8px"><span style="color:var(--gold);font-weight:700;min-width:60px">Фінал</span><span>Фінальний матч турніру.</span></div>
+    </div>
+    <div style="margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px">
+      <strong>Нічия у плей-офф:</strong> якщо прогнозуєш нічию в основний час — з'явиться питання «хто проходить далі?» (додатковий час / пенальті). Переможець автоматично потрапляє в наступний раунд.<br><br>
+      <strong>⚠️ Важливо:</strong> очки за рахунок у плей-офф рахуються <strong>тільки за основний час</strong>. Якщо прогнозував 1:1 і реально 1:1 — отримуєш 3 очки, навіть якщо не вгадав хто пройшов далі.
+    </div>
+  </div>
+
+  <!-- 4. НОМІНАЦІЇ -->
+  <div id="about-noms" class="sec-title">4. Номінації</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <p>На вкладці «Прогноз» є розділ Номінації — вибери країну для кожної:</p>
+    <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:.5rem">
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:20px">👟</span><div><strong>Найкращий бомбардир (Golden Boot)</strong> — країна найрезультативнішого гравця турніру. <span style="color:var(--gold)">15 очок</span></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:20px">🌟</span><div><strong>Гравець турніру (Golden Ball)</strong> — найкращий гравець за версією FIFA. <span style="color:var(--gold)">10 очок</span></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font-size:20px">🧤</span><div><strong>Найкращий воротар (Golden Glove)</strong> — найкращий воротар турніру. <span style="color:var(--gold)">10 очок</span></div></div>
+    </div>
+    <p style="margin-top:.75rem;color:var(--muted)">Кількість очок може бути змінена адміном. Адмін також може додати власні номінації.</p>
+  </div>
+
+  <!-- 5. ДОДАТКОВИЙ РАУНД -->
+  <div id="about-bonus" class="sec-title">5. Додатковий раунд</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <p>Адмін може активувати <strong>Додатковий раунд</strong> — окремий міні-турнір ставок поверх основного. Це може бути будь-що: прогнози конкретних матчів, спеціальні питання тощо.</p>
+    <div style="margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px">
+      <strong>Як це працює:</strong><br>
+      — Адмін створює раунд і встановлює окремий дедлайн<br>
+      — Учасники вводять прогнози на вкладці «Прогноз» → «Бонусний раунд»<br>
+      — Очки рахуються окремо і додаються до загального балансу<br>
+      — Результати вводить адмін після завершення раунду
+    </div>
+    <p style="margin-top:.75rem;color:var(--muted)">Якщо вкладка «Бонусний раунд» не відображається — адмін ще не активував цей режим.</p>
+  </div>
+
+  <!-- 6. СИСТЕМА БАЛІВ -->
+  <div id="about-scoring" class="sec-title">6. Повна система балів</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+
+    <div style="font-weight:700;font-size:13px;color:var(--gold);margin-bottom:.75rem;letter-spacing:.5px">РАХУНКИ МАТЧІВ</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;width:48px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">3</span></td>
+        <td style="padding:8px 4px;font-weight:700">Точний рахунок</td>
+        <td style="padding:8px 4px;color:var(--muted)">Прогноз 2:1 — реально 2:1</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">2</span></td>
+        <td style="padding:8px 4px;font-weight:700">Різниця + результат</td>
+        <td style="padding:8px 4px;color:var(--muted)">Прогноз 3:1, реально 2:0 — різниця +2, перемога ✓</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">1</span></td>
+        <td style="padding:8px 4px;font-weight:700">Тільки результат</td>
+        <td style="padding:8px 4px;color:var(--muted)">Прогноз 2:1, реально 3:1 — лише перемога ✓</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:#666">0</span></td>
+        <td style="padding:8px 4px;font-weight:700">Нічого</td>
+        <td style="padding:8px 4px;color:var(--muted)">Прогноз 2:1, реально 0:1 — нічого не вгадано</td>
+      </tr>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">⚠️ У плей-офф — тільки за основний час.</p>
+
+    <div style="font-weight:700;font-size:13px;color:var(--gold);margin:.75rem 0;letter-spacing:.5px">ПІДСУМКИ ГРУПИ (за кожну команду)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;width:48px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">1</span></td>
+        <td style="padding:8px 4px">Вгадав кількість очок команди в групі</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">1</span></td>
+        <td style="padding:8px 4px">Вгадав різницю м'ячів команди</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">1</span></td>
+        <td style="padding:8px 4px">Вгадав підсумкове місце команди в групі</td>
+      </tr>
+    </table>
+
+    <div style="font-weight:700;font-size:13px;color:var(--gold);margin:.75rem 0;letter-spacing:.5px">ПЛЕЙ-ОФФ (за кожну вгадану команду)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;width:48px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">2</span></td>
+        <td style="padding:8px 4px">Команда вийшла у 1/16</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">4</span></td>
+        <td style="padding:8px 4px">Команда вийшла у 1/8</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">6</span></td>
+        <td style="padding:8px 4px">Команда вийшла у 1/4</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">8</span></td>
+        <td style="padding:8px 4px">Команда вийшла у 1/2</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">10</span></td>
+        <td style="padding:8px 4px">Команда вийшла у фінал</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">15</span></td>
+        <td style="padding:8px 4px;font-weight:700">Чемпіон світу 🏆</td>
+      </tr>
+    </table>
+
+    <div style="font-weight:700;font-size:13px;color:var(--gold);margin:.75rem 0;letter-spacing:.5px">НОМІНАЦІЇ</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;width:48px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">15</span></td>
+        <td style="padding:8px 4px">👟 Найкращий бомбардир (Golden Boot)</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">10</span></td>
+        <td style="padding:8px 4px">🌟 Гравець турніру (Golden Ball)</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 4px"><span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">10</span></td>
+        <td style="padding:8px 4px">🧤 Найкращий воротар (Golden Glove)</td>
+      </tr>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">Кількість очок за номінації може змінити адмін.</p>
+  </div>
+
+  <!-- 7. ФІНАНСОВИЙ БАЛАНС -->
+  <div id="about-finance" class="sec-title">7. Фінансовий баланс</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <p><strong>1 очко = 1 UAH</strong> (або інша валюта — залежить від налаштувань адміна).</p>
+    <p style="margin-top:.75rem">Твій баланс по кожному матчу/номінації рахується як сума різниць з кожним суперником:</p>
+    <div style="margin-top:.75rem;padding:.75rem;background:var(--bg3);border-radius:8px">
+      <strong>Приклад:</strong> 4 учасники. Матч закінчився 2:1.<br>
+      — Ти вгадав точно → <span style="color:var(--gold)">3 очки</span><br>
+      — Суперник А вгадав результат → 1 очко<br>
+      — Суперник Б вгадав результат → 1 очко<br>
+      — Суперник В не вгадав → 0 очок<br><br>
+      Твій баланс: (3−1) + (3−1) + (3−0) = <span style="color:#4caf50;font-weight:700">+7 UAH</span><br>
+      Сума балансів усіх учасників = <strong>0</strong> (гра з нульовою сумою).
+    </div>
+    <p style="margin-top:.75rem;color:var(--muted)">Детальний баланс по кожному матчу і категорії — на вкладці «Всі прогнози» (після розкриття) та «Статистика».</p>
+  </div>
+
+  <!-- 8. КОЛЬОРОВІ ПОЗНАЧЕННЯ -->
+  <div id="about-colors" class="sec-title">8. Кольорові позначення</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;width:36px;font-size:18px">🟢</td>
+        <td style="padding:8px 4px;font-weight:700;color:#4caf50">Зелений ✓</td>
+        <td style="padding:8px 4px;color:var(--muted)">Точний рахунок — 3 очки</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:18px">🟠</td>
+        <td style="padding:8px 4px;font-weight:700;color:#ff9800">Помаранчевий ≈</td>
+        <td style="padding:8px 4px;color:var(--muted)">Різниця м'ячів — 2 очки</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:18px">🟡</td>
+        <td style="padding:8px 4px;font-weight:700;color:#ffd700">Жовтий ~</td>
+        <td style="padding:8px 4px;color:var(--muted)">Тільки результат В/Н/П — 1 очко</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:18px">🔴</td>
+        <td style="padding:8px 4px;font-weight:700;color:#f44336">Червоний ✗</td>
+        <td style="padding:8px 4px;color:var(--muted)">Нічого не вгадано — 0 очок</td>
+      </tr>
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 4px;font-size:18px">💚</td>
+        <td style="padding:8px 4px;font-weight:700;color:#4caf50">+70 UAH</td>
+        <td style="padding:8px 4px;color:var(--muted)">Заробив на цьому матчі порівняно з іншими</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 4px;font-size:18px">❤️</td>
+        <td style="padding:8px 4px;font-weight:700;color:#f44336">−20 UAH</td>
+        <td style="padding:8px 4px;color:var(--muted)">Програв на цьому матчі порівняно з іншими</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- 9. ЧАСТІ ПИТАННЯ -->
+  <div id="about-faq" class="sec-title">9. Часті питання</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;font-size:13px;line-height:1.7">
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Мої прогнози зникли після оновлення сторінки</div>
+        <div style="color:var(--muted)">Дані синхронізуються з хмарою. Якщо є інтернет — все відновиться при завантаженні. Якщо проблема — зверніться до адміна.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Не можу перейти на 1/16 — показує порожньо</div>
+        <div style="color:var(--muted)">Спочатку заповни ВСІ 12 груп (всі 6 матчів у кожній). Тоді перейди на 1/16 — пари з'являться автоматично.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Забув PIN</div>
+        <div style="color:var(--muted)">Зверніться до адміна — він може скинути твій PIN. Прогноз при цьому не видаляється.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Значок 🔒 — мій прогноз заблоковано?</div>
+        <div style="color:var(--muted)">Ні. Ти можеш вводити і зберігати прогнози. Значок означає лише що інші учасники не бачать твоїх прогнозів до дедлайну.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Як рахується нічия у плей-офф?</div>
+        <div style="color:var(--muted)">Очки за рахунок — тільки за основний час. Якщо прогнозував 1:1 і реально 1:1 → 3 очки. Але хто пройде далі визначається твоїм вибором додаткового часу/пенальті.</div>
+      </div>
+      <div>
+        <div style="font-weight:700;margin-bottom:3px">❓ Коли можна побачити прогнози інших?</div>
+        <div style="color:var(--muted)">Після дедлайну адмін відкриває прогнози. Тоді на вкладці «Всі прогнози» можна вибрати будь-якого учасника і переглянути його прогнози з кольоровим маркуванням.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- РОЛІ -->
   <div class="sec-title" data-i18n="roles">Ролі</div>
   <div class="role-grid">
     <div class="role-card">
@@ -323,16 +594,6 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       <div class="role-item"><span class="role-check">✓</span><span data-i18n="r_p5">Переглядає прогнози всіх після розкриття</span></div>
       <div class="role-item"><span class="role-check">✓</span><span data-i18n="r_p6">Бере участь у додатковому раунді</span></div>
     </div>
-  </div>
-  <div style="margin-top:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;">
-    <div class="sec-title" style="font-size:18px" data-i18n="scoring_short">Коротко про бали</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:.5rem">
-      <div style="background:var(--bg3);border-radius:6px;padding:8px 14px;font-size:13px"><span style="font-family:'Bebas Neue';font-size:20px;color:var(--gold)">3</span> <span data-i18n="pts_exact">Точний рахунок</span></div>
-      <div style="background:var(--bg3);border-radius:6px;padding:8px 14px;font-size:13px"><span style="font-family:'Bebas Neue';font-size:20px;color:var(--gold)">1</span> <span data-i18n="pts_result">Результат</span></div>
-      <div style="background:var(--bg3);border-radius:6px;padding:8px 14px;font-size:13px"><span style="font-family:'Bebas Neue';font-size:20px;color:var(--gold)">1+1+1</span> <span data-i18n="pts_group">Підсумки групи</span></div>
-      <div style="background:var(--bg3);border-radius:6px;padding:8px 14px;font-size:13px"><span style="font-family:'Bebas Neue';font-size:20px;color:var(--gold)">2→15</span> <span data-i18n="pts_playoff">Плей-офф → Чемпіон</span></div>
-    </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:10px" data-i18n="pts_note">1 очко = 1 гривня (або інша валюта — налаштовує адмін)</p>
   </div>
 </div>
 

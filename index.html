@@ -245,6 +245,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
         <button class="nav-tab" onclick="goPage('groupstage',this)">Груп.етап</button>
         <button class="nav-tab" onclick="goPage('results',this)" data-i18n="nav_results">Результати</button>
         <button class="nav-tab" onclick="goPage('bracket',this)" data-i18n="nav_bracket">Сітка</button>
+        <button class="nav-tab" id="nav-live-tab" onclick="goPage('live',this)" style="display:none;color:#ff6b6b">🔴 Live</button>
         <button class="nav-tab" onclick="goPage('predict',this)" data-i18n="nav_predict">Прогноз</button>
         <button class="nav-tab" onclick="goPage('allpreds',this)" data-i18n="nav_allpreds">Всі прогнози</button>
         <button class="nav-tab" onclick="goPage('leaderboard',this)" data-i18n="nav_lb">Рейтинг</button>
@@ -365,7 +366,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
 
       <div style="display:flex;gap:12px;padding:.75rem 0;border-bottom:1px solid var(--border)">
         <div style="min-width:110px;font-weight:700;font-size:13px;color:var(--gold)">Рейтинг</div>
-        <div style="font-size:13px;color:var(--muted)">Таблиця лідерів з очками по категоріях (рахунки, групи, плей-офф, номінації, бонус) і фінансовим балансом у гривнях.</div>
+        <div style="font-size:13px;color:var(--muted)">Таблиця лідерів з очками по категоріях (рахунки, групи, плей-офф, номінації, бонус), 4 окремі каси з нульовою сумою і зведеним фінансовим балансом у гривнях.</div>
       </div>
 
       <div style="display:flex;gap:12px;padding:.75rem 0;border-bottom:1px solid var(--border)">
@@ -583,6 +584,30 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       Сума балансів усіх учасників = <strong>0</strong> (гра з нульовою сумою).
     </div>
     <p style="margin-top:.75rem;color:var(--muted)">Детальний баланс по кожному матчу і категорії — на вкладці «Всі прогнози» (після розкриття) та «Статистика».</p>
+
+    <div style="font-weight:700;font-size:13px;color:var(--gold);margin:1.25rem 0 .5rem;letter-spacing:.5px">4 ПАРАЛЕЛЬНІ КАСИ</div>
+    <p>Турнір складається з <strong>чотирьох незалежних кас</strong>. Кожна каса — окрема гра з нульовою сумою: гроші перерозподіляються <strong>лише між тими, хто в цій касі бере участь</strong>. Ти можеш грати в одній касі, кількох або всіх одразу.</p>
+    <div style="margin-top:.75rem;display:flex;flex-direction:column;gap:0">
+      <div style="display:flex;gap:12px;padding:.6rem 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:130px;font-weight:700;font-size:13px;color:var(--gold)">🥅 Груповий етап</div>
+        <div style="font-size:13px;color:var(--muted)">Учасник, якщо заповнив <strong>усі</strong> матчі групової стадії. Рахуються бали за рахунки групових матчів і підсумки груп.</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:.6rem 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:130px;font-weight:700;font-size:13px;color:var(--gold)">🏟️ Плей-оф</div>
+        <div style="font-size:13px;color:var(--muted)">Учасник, лише якщо заповнив плей-оф <strong>повністю</strong> — аж до фіналу і матчу за 3-тє місце. Хто заповнив частково — у цю касу не входить (не платить і не виграє в ній). Рахуються рахунки плей-оф матчів, вихід команд у раунди і чемпіон.</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:.6rem 0;border-bottom:1px solid var(--border)">
+        <div style="min-width:130px;font-weight:700;font-size:13px;color:var(--gold)">🏅 Номінації</div>
+        <div style="font-size:13px;color:var(--muted)">Учасник, лише якщо заповнив <strong>усі</strong> номінації. Рахуються бали за вгадані номінації.</div>
+      </div>
+      <div style="display:flex;gap:12px;padding:.6rem 0">
+        <div style="min-width:130px;font-weight:700;font-size:13px;color:var(--blue3)">🎯 Бонусний раунд</div>
+        <div style="font-size:13px;color:var(--muted)">Окрема каса з власною ставкою. Активується адміном (зазвичай перед плей-оф). Деталі — у розділі «Додатковий раунд».</div>
+      </div>
+    </div>
+    <div style="margin-top:.75rem;padding:.75rem;background:rgba(255,215,0,.08);border-radius:8px;border-left:3px solid var(--gold);font-size:13px">
+      💡 <strong>Навіщо так?</strong> Якщо хтось заповнив тільки групи, було б нечесно ставити його в один казан із тими, хто заповнив усе. Окремі каси гарантують: ти змагаєшся за гроші лише з тими, хто грав у тому самому етапі. У таблиці «Рейтинг» кожна каса показана окремо, а колонка «Баланс» у головній таблиці — це <strong>зведена сума по всіх касах</strong>, де ти береш участь.
+    </div>
 
     <div style="font-weight:700;font-size:13px;color:var(--gold);margin:1rem 0 .5rem;letter-spacing:.5px">МАКСИМУМ ОЧОК — ОСНОВНИЙ ТУРНІР</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:.5rem">
@@ -817,11 +842,19 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
   <div class="stage-tabs">
     <div class="stab active" onclick="showBracket('real',this)" data-i18n="bracket_real">Реальна сітка</div>
     <div class="stab" onclick="showBracket('pred',this)" data-i18n="bracket_pred">Мій прогноз</div>
+    <div class="stab" id="bracket-bonus-tab" onclick="showBracket('bonus',this)" style="display:none">🎯 Бонусний прогноз</div>
   </div>
   <div style="margin-bottom:10px">
     <select id="bracket-user" onchange="renderBracket()" style="display:none;min-width:160px"></select>
   </div>
   <div id="bracket-content"></div>
+</div>
+
+<!-- ══ LIVE (прогнози на матч, що йде) ══ -->
+<div id="page-live" class="page">
+  <div class="sec-title">🔴 Зараз грають</div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:1rem">Прогнози всіх учасників на матчі, які адмін позначив як «йде зараз». Оновлюється при заході на сторінку.</p>
+  <div id="live-content"></div>
 </div>
 
 <!-- ══ PREDICT ══ -->
@@ -887,6 +920,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
     </tr></thead>
     <tbody id="lb-body"></tbody>
   </table></div>
+  <div id="lb-pools-section"></div>
   <div id="lb-bonus-section"></div>
   <div id="lb-combined-section"></div>
   <div id="lb-ideal-section"></div>
@@ -1092,6 +1126,7 @@ let S=JSON.parse(localStorage.getItem(KEY)||'null')||{
   matches:{},
   predictions:{},
   predsVisible:false,
+  liveMatches:[],      // id матчів, які адмін позначив «йде зараз» (точкове розкриття прогнозів)
   deadline:null,       // ISO рядок дедлайну основного турніру (null = без дедлайну)
   bonusDeadline:null,  // ISO рядок дедлайну бонусного раунду
   bonusRound:{active:false,label:'Бонусний раунд 1/16',ptsScore:3,ptsDiff:2,ptsResult:1,ptsAdvance:4,rate:1,predictions:{},results:{}},
@@ -1150,6 +1185,15 @@ function fmtDeadline(iso){
 function allTeams(){return Object.values(GROUPS).flatMap(g=>g.teams.map(t=>t.n));}
 function gmId(g,k){return `g${g}${k}`;}
 function poId(r,i){return `${r}_${i}`;}
+// Чи всі 6 матчів групи g зіграні (мають реальний результат).
+// Бали за місце/очки/різницю в групі нараховуються лише коли група дограна.
+function isGroupFullyPlayed(g){
+  for(let k=0;k<MATCH_PAIRS.length;k++){
+    const res=S.matches[gmId(g,k)];
+    if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined)return false;
+  }
+  return true;
+}
 function allGroupMatches(){
   const ms=[];
   Object.entries(GROUPS).forEach(([g,gd])=>{
@@ -1176,12 +1220,14 @@ function calcDetailedPts(name){
   let groupPtsCount=0,goalDiffCount=0,placeCount=0;
   let r32=0,r16=0,r8=0,r4=0,fin=0,champ=0,nomPts=0;
   let matchPts=0,groupPts=0;
+  let matchPtsGroup=0,matchPtsPlayoff=0;
 
   allGroupMatches().forEach(m=>{
     const res=S.matches[m.id],p=pm[m.id];
-    if(!res||res.h===''||res.h===undefined||!p||p.h===''||p.h===undefined)return;
+    if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined||!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
     const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,s);
     matchPts+=sc.exact+sc.result+sc.diff;
+    matchPtsGroup+=sc.exact+sc.result+sc.diff;
     if(sc.exact) exactCount++;
     else if(sc.diff) diffCount++;   // diff implies result too — show as ≈
     else if(sc.result) resultCount++;
@@ -1193,7 +1239,7 @@ function calcDetailedPts(name){
   Object.keys(GROUPS).forEach(g=>{
     const realTeamsG=realRankedG[g]||[];
     const predTeamsG=predRankedG[g]||[];
-    if(!realTeamsG.some(t=>t.p>0))return; // group not played yet
+    if(!isGroupFullyPlayed(g))return; // бали за групу — лише коли всі матчі групи зіграні
     realTeamsG.forEach((rt,ri)=>{
       const pt=predTeamsG.find(x=>x.n===rt.n);
       if(!pt)return;
@@ -1209,6 +1255,11 @@ function calcDetailedPts(name){
   // Playoff match scores: for each real match, find player's prediction by team pair
   // using the player's own predicted bracket (getPredSlotsForRound)
   const isRealTeamName=t=>t&&!t.startsWith('Матч')&&!t.startsWith('Пер.')&&!t.startsWith('TBD')&&t!=='Команда B'&&t!=='—';
+  // Плей-оф бали нараховуються ЛИШЕ якщо учасник заповнив плей-оф повністю
+  // (критерій каси плей-оф: final_0 + third_0). Інакше весь плей-оф блок = 0,
+  // навіть якщо 1/16 деривується з групових прогнозів. Перша каса (групи)
+  // завершується на груповому етапі.
+  if(inPlayoffPool(name)){
   PLAYOFF_ROUNDS.forEach(round=>{
     let predSlots=[];
     try{predSlots=getPredSlotsForRound(round.id,pred);}catch(e){}
@@ -1237,6 +1288,7 @@ function calcDetailedPts(name){
       else{pH=+p.a;pA=+p.h;} // predHome===realAway, so swap
       const sc=scoreMatch(rH,rA,pH,pA,s);
       matchPts+=sc.exact+sc.result+sc.diff;
+      matchPtsPlayoff+=sc.exact+sc.result+sc.diff;
       if(sc.exact) exactCount++;
       else if(sc.diff) diffCount++;
       else if(sc.result) resultCount++;
@@ -1273,6 +1325,7 @@ function calcDetailedPts(name){
       if(cp&&realChamp&&cp===realChamp)champ+=s.champ;
     }
   });
+  } // кінець guard inPlayoffPool
   (S.nominations||[]).forEach(n=>{if(n.winner&&(pred.nominations||{})[n.id]===n.winner)nomPts+=n.pts;});
 
   // Bonus round — separate, full playoff 1/16→final+champ+noms
@@ -1349,12 +1402,87 @@ function calcDetailedPts(name){
   }
 
   const total=matchPts+groupPts+r32+r16+r8+r4+fin+champ+nomPts;
-  return{matchPts,groupPts,r32,r16,r8,r4,fin,champ,nomPts,total,bonusPts,
+  // Пулові підсумки (4 окремі каси). Σ компонентів == total за побудовою.
+  const poolGroup=matchPtsGroup+groupPts;
+  const poolPlayoff=matchPtsPlayoff+r32+r16+r8+r4+fin+champ;
+  const poolNoms=nomPts;
+  return{matchPts,matchPtsGroup,matchPtsPlayoff,groupPts,r32,r16,r8,r4,fin,champ,nomPts,total,bonusPts,
+    poolGroup,poolPlayoff,poolNoms,
     detail:{exactCount,resultCount,diffCount,groupPtsCount,goalDiffCount,placeCount},
     bonusDetail:{bExact,bResult,bR32,bR16,bR8,bR4,bFin,bChamp,bNom}};
 }
 
 function calcPts(name){return calcDetailedPts(name);}
+
+// ══════════════════════════════════════════════════════════════════
+// 4 ОКРЕМІ КАСИ (pools) — критерії участі + zero-sum баланс
+// Логіка не залежить від брендингу/UI → переноситься в обидві гілки.
+// ══════════════════════════════════════════════════════════════════
+
+// Чи заповнено матч (рахунок) у наборі pm за ключем mid
+function _hasScore(pm,mid){
+  const p=(pm||{})[mid];
+  return !!(p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined);
+}
+
+// Каса ГРУП: учасник, лише якщо заповнив УСІ матчі групового етапу.
+function inGroupPool(name){
+  const pm=(S.predictions[name]||{}).matches||{};
+  const gm=allGroupMatches();
+  if(gm.length===0)return false;
+  return gm.every(m=>_hasScore(pm,m.id));
+}
+// Скільки групових матчів НЕ заповнено (для попередження учаснику)
+function groupMatchesLeft(name){
+  const pm=(S.predictions[name]||{}).matches||{};
+  return allGroupMatches().filter(m=>!_hasScore(pm,m.id)).length;
+}
+
+// Каса ПЛЕЙ-ОФ: учасник, якщо заповнив рахунок фіналу І матчу за 3-тє місце.
+// Це надійний проксі «повністю заповнив плей-оф»: фінал і 3-тє — кінцеві
+// вузли деривованого бракета, тож вони заповнюються лише коли заповнений
+// весь ланцюжок раундів.
+function inPlayoffPool(name){
+  const pm=(S.predictions[name]||{}).matches||{};
+  return _hasScore(pm,'final_0')&&_hasScore(pm,'third_0');
+}
+
+// Каса НОМІНАЦІЙ: учасник, якщо заповнив УСІ номінації.
+function inNomPool(name){
+  const pred=S.predictions[name]||{};
+  const noms=pred.nominations||{};
+  const all=(S.nominations||[]);
+  if(all.length===0)return false;
+  return all.every(n=>noms[n.id]&&noms[n.id]!=='');
+}
+
+// Список учасників каси за предикатом
+function poolMembers(predicate){
+  return (S.participants||[]).filter(n=>{try{return predicate(n);}catch(e){return false;}});
+}
+
+// Універсальний розрахунок балансів каси.
+// memberNames — хто в касі; ptsField — поле з calcPts (poolGroup/poolPlayoff/poolNoms);
+// rate — ставка. Повертає Map(name → баланс) з Σ == 0 (largest-remainder).
+// Кожен виклик будує СВІЙ масив (новий reference) — _balanceCache не плутається.
+function calcPoolBalances(memberNames, ptsField, rate){
+  const data=memberNames.map(n=>({n, total:calcPts(n)[ptsField]||0}));
+  if(data.length===0)return new Map();
+  return calcAllBalances(data, +rate||1);
+}
+
+// Зведений баланс гравця по всіх 4 касах (сума балансів тих кас, де він бере участь).
+// Кожна каса окремо zero-sum → сума всіх зведених балансів теж == 0.
+function calcPoolBalanceBreakdown(name){
+  const rate=(S.currency||{rate:1}).rate||1;
+  const gM=poolMembers(inGroupPool), pM=poolMembers(inPlayoffPool), nM=poolMembers(inNomPool);
+  const gBal=inGroupPool(name)?(calcPoolBalances(gM,'poolGroup',rate).get(name)||0):0;
+  const pBal=inPlayoffPool(name)?(calcPoolBalances(pM,'poolPlayoff',rate).get(name)||0):0;
+  const nBal=inNomPool(name)?(calcPoolBalances(nM,'poolNoms',rate).get(name)||0):0;
+  const bonusParts=getBonusParticipants();
+  const bBal=bonusParts.includes(name)?calcBonusBalance(name,bonusParts):0;
+  return{group:gBal, playoff:pBal, noms:nBal, bonus:bBal, total:gBal+pBal+nBal+bBal};
+}
 
 // Returns list of participants who made at least one bonus prediction
 function getBonusParticipants(){
@@ -1440,8 +1568,12 @@ function goPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   el.classList.add('active');curPage=id;
   const renders={home:renderHome,groups:renderGroups,groupstage:renderGroupStage,stats:renderStats,results:()=>renderResults('group'),
-    bracket:()=>{bracketMode='real';renderBracket();},
+    bracket:()=>{bracketMode='real';syncBracketBonusTab();
+      document.querySelectorAll('#page-bracket .stab').forEach((t,i)=>t.classList.toggle('active',i===0));
+      const usel=document.getElementById('bracket-user');if(usel)usel.style.display='none';
+      renderBracket();},
     predict:renderPredict,allpreds:renderAllPreds,
+    live:renderLive,
     leaderboard:renderLeaderboard,awards:renderAwards,rules:renderRules,admin:renderAdminPage};
   if(renders[id])renders[id]();
 }
@@ -1538,14 +1670,43 @@ let bracketMode='real';
 function showBracket(mode,el){
   bracketMode=mode;
   document.querySelectorAll('#page-bracket .stab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
+  if(el)el.classList.add('active');
   const usel=document.getElementById('bracket-user');
-  if(mode==='pred'){usel.style.display='';renderBracketUserSel();}else{usel.style.display='none';}
+  // селектор учасника потрібен і для прогнозу, і для бонусного прогнозу
+  if(mode==='pred'||mode==='bonus'){usel.style.display='';renderBracketUserSel(mode);}else{usel.style.display='none';}
   renderBracket();
 }
-function renderBracketUserSel(){
+// Показати/сховати вкладку бонусного прогнозу залежно від активності бонусу
+function syncBracketBonusTab(){
+  const tab=document.getElementById('bracket-bonus-tab');
+  if(!tab)return;
+  const on=!!(S.bonusRound&&S.bonusRound.active);
+  tab.style.display=on?'':'none';
+  // якщо бонус вимкнули, а ми були в bonus-режимі — повертаємось на реальну
+  if(!on&&bracketMode==='bonus'){
+    bracketMode='real';
+    document.querySelectorAll('#page-bracket .stab').forEach(t=>t.classList.remove('active'));
+    const realTab=document.querySelector('#page-bracket .stab');
+    if(realTab)realTab.classList.add('active');
+    const usel=document.getElementById('bracket-user');if(usel)usel.style.display='none';
+  }
+}
+function renderBracketUserSel(mode){
   const sel=document.getElementById('bracket-user');
-  sel.innerHTML='<option value="">— обери учасника —</option>'+S.participants.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+  // До розкриття прогнозів учасник бачить у списку лише себе (авторизованого).
+  // Після розкриття (S.predsVisible) або для адміна — усіх.
+  let names=S.participants;
+  if(mode==='bonus'){
+    // для бонусного режиму — лише учасники бонусу
+    const bp=getBonusParticipants();
+    names=S.participants.filter(n=>bp.includes(n));
+  }
+  if(!S.predsVisible&&!adminUnlocked){
+    names=(unlockedUser&&names.includes(unlockedUser))?[unlockedUser]:[];
+  }
+  sel.innerHTML='<option value="">— обери учасника —</option>'+names.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+  // Якщо раніше був обраний хтось інший — скидаємо вибір
+  if(sel.value&&!names.includes(sel.value))sel.value='';
 }
 function getRealRankedGroups(){
   // Build real standings from actual entered results.
@@ -1631,16 +1792,94 @@ function getRealSlotsForRound(roundId){
   return[];
 }
 
+// Слоти бонусної сітки для раунду. 1/16 (r32) = реальні слоти;
+// 1/8…фінал — деривуються з бонусних прогнозів учасника (ключі b_{round}_{i}).
+function getBonusSlotsForRound(roundId, bpred){
+  const bpm=(bpred&&bpred.matches)||{};
+  const r32=getRealR32Slots(); // 16 пар 1/16
+  if(roundId==='r32')return r32;
+  function bonusWinner(mid,home,away){
+    const p=bpm[mid];
+    if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return null;
+    if(+p.h>+p.a)return home;
+    if(+p.a>+p.h)return away;
+    return p.winner||null;
+  }
+  function nextSlots(prevSlots,prevRoundId){
+    const seq={r32:'r16',r16:'r8',r8:'r4',r4:'final'};
+    const nr=seq[prevRoundId]||prevRoundId;
+    const out=[];
+    for(let i=0;i<prevSlots.length;i+=2){
+      const s1=prevSlots[i],s2=prevSlots[i+1];
+      if(!s1||!s2)continue;
+      const w1=bonusWinner('b_'+prevRoundId+'_'+i,s1.home,s1.away)||'?';
+      const w2=bonusWinner('b_'+prevRoundId+'_'+(i+1),s2.home,s2.away)||'?';
+      out.push({id:nr+'_'+Math.floor(i/2),n:Math.floor(i/2)+1,home:w1,away:w2});
+    }
+    return out;
+  }
+  const r16=nextSlots(r32,'r32');
+  if(roundId==='r16')return r16;
+  const r8=nextSlots(r16,'r16');
+  if(roundId==='r8')return r8;
+  const r4=nextSlots(r8,'r8');
+  if(roundId==='r4')return r4;
+  const fin=nextSlots(r4,'r4');
+  if(roundId==='final')return fin;
+  if(roundId==='third'){
+    // переможені півфіналів (r4)
+    function loser(idx){
+      const slot=r4[idx];
+      if(!slot||slot.home==='?'||slot.away==='?')return '?';
+      const p=bpm['b_r4_'+idx];
+      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return '?';
+      if(+p.h>+p.a)return slot.away;
+      if(+p.a>+p.h)return slot.home;
+      const w=p.winner||'';
+      if(w===slot.home)return slot.away;
+      if(w===slot.away)return slot.home;
+      return '?';
+    }
+    return [{id:'third_0',n:1,home:loser(0),away:loser(1)}];
+  }
+  return [];
+}
+
 function renderBracket(){
   const el=document.getElementById('bracket-content');
   const isReal=bracketMode==='real';
   const user=document.getElementById('bracket-user')?.value||'';
+  // ── Захист видимості: у режимі прогнозу до розкриття можна дивитись
+  // лише власний прогноз (авторизований користувач) або все — адміну.
+  if(!isReal&&!S.predsVisible&&!adminUnlocked&&user&&user!==unlockedUser){
+    if(el)el.innerHTML='<div style="text-align:center;padding:3rem 1rem;color:var(--muted)">'+
+      '<div style="font-size:32px;margin-bottom:.5rem">🔒</div>'+
+      '<div style="font-weight:700;font-size:15px;margin-bottom:.3rem">Прогнози приховані</div>'+
+      '<div style="font-size:13px">Прогнози інших учасників стануть видимі після того, як адмін відкриє їх (зазвичай після дедлайну).</div>'+
+      '</div>';
+    return;
+  }
+  const isBonus=bracketMode==='bonus';
   const pred=user?(S.predictions[user]||{}):{};
-  const matchRes=isReal?S.matches:(pred.matches||{});
+  const br=S.bonusRound||{};
+  const bpred=(isBonus&&user)?((br.predictions||{})[user]||{}):{};
+
+  // Для бонусу: матчі лежать під ключами b_{round}_{i}. Re-key у {round}_{i},
+  // щоб renderMatch (який очікує r16_0, r8_0 …) їх знайшов.
+  let bonusMatchRes={};
+  if(isBonus){
+    const bm=bpred.matches||{};
+    Object.keys(bm).forEach(k=>{
+      const m=k.match(/^b_(.+)$/);
+      if(m)bonusMatchRes[m[1]]=bm[k];
+    });
+  }
+  const matchRes=isReal?S.matches:(isBonus?bonusMatchRes:(pred.matches||{}));
 
   // Get slots for all rounds
   const getSlots=(id)=>{
     if(isReal)return getRealSlotsForRound(id);
+    if(isBonus){try{return getBonusSlotsForRound(id,bpred);}catch(e){return[];}}
     try{return getPredSlotsForRound(id,pred);}catch(e){return[];}
   };
 
@@ -1796,7 +2035,7 @@ function calcGroupStandingsFromMatches(matches){
     gd.teams.forEach(t=>{standings[g][t.n]={n:t.n,iso:t.iso,g,p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0};});
     MATCH_PAIRS.forEach(([i,j],k)=>{
       const mid=`g${g}${k}`,res=matches[mid];
-      if(!res||res.h===''||res.h===undefined)return;
+      if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined)return; // обидва боки мають бути заповнені
       const hn=gd.teams[i].n,an=gd.teams[j].n,rH=+res.h,rA=+res.a;
       standings[g][hn].p++;standings[g][an].p++;
       standings[g][hn].gf+=rH;standings[g][hn].ga+=rA;standings[g][hn].gd+=rH-rA;
@@ -1843,6 +2082,28 @@ function getRankedGroups(matches, manualRanksByGroup){
   return ranked;
 }
 
+// Ефективний топ-8 третіх місць з урахуванням ручного вибору в tie-resolver.
+// thirds — повний відсортований список; tied — команди в зоні рівності на межі 8;
+// resolved — обрані користувачем команди (масив {n,fromGroup}).
+// Команди вище зони рівності проходять автоматично; зону рівності заповнюємо
+// згідно resolved, щоб у складі була саме обрана користувачем команда.
+function getEffectiveTop8Thirds(thirds,tied,resolved){
+  var valid=thirds.filter(function(t){return t&&t.n;});
+  if(valid.length<8)return valid.slice(0,8);
+  if(!tied||tied.length===0)return valid.slice(0,8);
+  var tiedNames={};tied.forEach(function(t){tiedNames[t.n]=true;});
+  var resolvedNames={};(resolved||[]).forEach(function(r){if(r&&r.n)resolvedNames[r.n]=true;});
+  // Автоматичні (вище зони рівності) + обрані з зони рівності, у порядку valid.
+  var out=[];
+  for(var i=0;i<valid.length&&out.length<8;i++){
+    var t=valid[i];
+    if(!tiedNames[t.n]){out.push(t);}        // поза зоною рівності → проходить
+    else if(resolvedNames[t.n]){out.push(t);} // у зоні рівності й обрана користувачем
+  }
+  // Якщо resolved ще не зроблено (out<8) — fallback на простий зріз.
+  if(out.length<8)return valid.slice(0,8);
+  return out;
+}
 function getThirdPlacesRanked(ranked){
   return Object.entries(ranked)
     .filter(([g,teams])=>teams[2]&&teams[2].n)
@@ -2298,6 +2559,13 @@ function onPredUserChange(){
 
   if(!name){buildPredStageTabs();renderPredContent();return;}
 
+  // Адмін переглядає будь-чий прогноз без PIN (тільки перегляд — поля заблоковані).
+  if(adminUnlocked){
+    buildPredStageTabs();
+    renderPredContent();
+    return;
+  }
+
   const pred=S.predictions[name]||{};
   const hasLocalPin=pred.pin&&pred.pin.length>0;
 
@@ -2641,12 +2909,19 @@ function savePredSlotAssign(){
 }
 
 function saveTieResolve(needCount){
+  var user=document.getElementById('pred-user').value;
+  if(!user){toast('Спочатку обери ім\'я');return;}
+  if(!S.predictions[user])S.predictions[user]={};
+  var pred=S.predictions[user];
+  var checked=Array.from(document.querySelectorAll('#pred-content [data-tieenc]:checked'));
   if(checked.length===0){toast('Обери команди');return;}
   if(needCount&&checked.length!==needCount){toast('Обери рівно '+needCount+' команди');return;}
   pred.resolvedThirds=[];
   checked.forEach(function(r){
     try{pred.resolvedThirds.push(JSON.parse(decodeURIComponent(r.dataset.tieenc||"{}")));}catch(e){}
   });
+  // Склад топ-8 третіх місць міг змінитися → скидаємо старий розподіл слотів
+  pred.thirdSlotAssign={};
   save();
   var ok=document.getElementById('tie-ok');
   if(ok){ok.style.display='inline';setTimeout(function(){ok.style.display='none';},2000);}
@@ -2669,7 +2944,9 @@ function renderPredContent(){
   var pastMain=isPastDeadline()&&!adminUnlocked;
   var pastBonus=isPastBonusDeadline()&&!adminUnlocked;
   var notAuthorized=user&&unlockedUser!==user&&!adminUnlocked;
-  var dis=!user||notAuthorized||(predStage!=='bonus'?pastMain:pastBonus);
+  // Адмін, що переглядає чужий прогноз (не залогінений як цей учасник) — лише читання.
+  var adminViewing=user&&adminUnlocked&&unlockedUser!==user;
+  var dis=!user||notAuthorized||adminViewing||(predStage!=='bonus'?pastMain:pastBonus);
   var el=document.getElementById('pred-content');
   var badge=document.getElementById('pred-lock-badge');
   if(badge)badge.style.display=S.predsVisible?'none':'inline-flex';
@@ -2704,6 +2981,21 @@ function renderPredContent(){
 function renderPredGroup(pred,dis,el){
   var pm=pred.matches||{};
   var html='';
+  // Дружнє попередження: каса групового етапу вимагає заповнення ВСІХ матчів.
+  // Показуємо лише авторизованому учаснику, що дивиться свій прогноз.
+  var curUser=document.getElementById('pred-user').value;
+  if(curUser&&unlockedUser===curUser){
+    var left=groupMatchesLeft(curUser);
+    if(left>0){
+      html+='<div style="padding:.75rem 1rem;background:rgba(255,180,60,.1);border:1px solid rgba(255,180,60,.35);border-radius:8px;margin-bottom:1rem;font-size:13px;line-height:1.5">'+
+        '⚠️ <strong>Ви заповнили не всі матчі групового етапу.</strong> Щоб брати участь у касі групового етапу, потрібно заповнити <strong>всі</strong> матчі. Залишилось: <strong>'+left+'</strong>. Можете зберігати прогрес і дозаповнити пізніше — у касу ви потрапите автоматично, коли заповните всі.'+
+        '</div>';
+    } else {
+      html+='<div style="padding:.6rem 1rem;background:rgba(80,200,120,.1);border:1px solid rgba(80,200,120,.3);border-radius:8px;margin-bottom:1rem;font-size:13px">'+
+        '✅ Усі матчі групового етапу заповнені — ви берете участь у касі групового етапу.'+
+        '</div>';
+    }
+  }
   Object.entries(GROUPS).forEach(function(entry){
     var g=entry[0], gd=entry[1];
     html+='<div class="pred-group-block"><div class="pred-group-title">Група '+g+'</div>';
@@ -2718,7 +3010,7 @@ function renderPredGroup(pred,dis,el){
       html+='<input class="pred-si" type="number" data-mid="'+mid+'" data-side="h" value="'+ph+'" min="0" max="20"'+(dis?' disabled':'')+' >';
       html+='<span class="pred-sep">:</span>';
       html+='<input class="pred-si" type="number" data-mid="'+mid+'" data-side="a" value="'+pa+'" min="0" max="20"'+(dis?' disabled':'')+' >';
-      html+='<span class="pred-tname r">'+gd.teams[j].n+'</span>';
+      html+='<span class="pred-tname r">'+flag(gd.teams[j].iso)+gd.teams[j].n+'</span>';
       html+='</div>';
     });
     html+='</div>';
@@ -2739,7 +3031,7 @@ function renderPredGroup(pred,dis,el){
     Object.entries(ranked).forEach(function(e2){
       var g2=e2[0], teams=e2[1];
       var realT=realRankedAll[g2]||[];
-      var hasReal=realT.some(function(t){return t.p>0;});
+      var hasReal=isGroupFullyPlayed(g2);
 
       html+='<div class="card-sm">';
       html+='<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin-bottom:8px">ГРУПА '+g2+'</div>';
@@ -2927,10 +3219,17 @@ function renderPredGroup(pred,dis,el){
     }
 
     // ── Розподіл третіх місць по слотах 1/16 ─────────────────────────
-    var validThirds=thirds.filter(function(t){return t&&t.n;}).slice(0,8);
+    // Ефективний топ-8: враховуємо вибір користувача в tie-resolver,
+    // щоб обрана на межі команда (а не авто-сортування) була у складі.
+    var validThirds=getEffectiveTop8Thirds(thirds,tied,resolved);
     var tiedResolved=tied.length===0||(resolved.filter(function(r){return r&&r.n;}).length>0);
     if(validThirds.length===8&&tiedResolved&&!dis){
       var tsa=pred.thirdSlotAssign||{};
+      // Скид застарілого розподілу: якщо в thirdSlotAssign є команда,
+      // якої вже немає в ефективному топ-8 → чистимо весь розподіл.
+      var top8Names={};validThirds.forEach(function(t){top8Names[t.n]=true;});
+      var stale=Object.keys(tsa).some(function(k){return tsa[k]&&!top8Names[tsa[k]];});
+      if(stale){pred.thirdSlotAssign={};tsa={};save();}
       var slotDescs=[
         {i:0,label:'Матч 1: Переможець E vs',winnerGroup:'E'},
         {i:1,label:'Матч 2: Переможець I vs',winnerGroup:'I'},
@@ -3345,6 +3644,31 @@ function onBonusInput(mid,home,away){
 function savePredictions(){
   const user=document.getElementById('pred-user').value;
   if(!user){toast('Спочатку обери ім\'я');return;}
+  // ── Перевірка напівзаповнених матчів (заповнений лише один бік) ──
+  var sideVals={};
+  document.querySelectorAll('#pred-content .pred-si').forEach(function(inp){
+    var mid=inp.dataset.mid,side=inp.dataset.side;
+    if(!mid||!side)return;
+    if(!sideVals[mid])sideVals[mid]={};
+    sideVals[mid][side]=inp.value;
+  });
+  var halfFilled=Object.keys(sideVals).filter(function(mid){
+    var v=sideVals[mid];
+    var hF=v.h!==''&&v.h!==undefined;
+    var aF=v.a!==''&&v.a!==undefined;
+    return hF!==aF;
+  });
+  if(halfFilled.length>0){
+    document.querySelectorAll('#pred-content .pred-si').forEach(function(inp){
+      if(halfFilled.indexOf(inp.dataset.mid)>=0){
+        inp.style.borderColor='#e74c3c';
+        inp.style.boxShadow='0 0 0 2px rgba(231,76,60,.25)';
+      }
+    });
+    toast('\u26a0\ufe0f \u0423 '+halfFilled.length+' \u043c\u0430\u0442\u0447(\u0430\u0445) \u0437\u0430\u043f\u043e\u0432\u043d\u0435\u043d\u043e \u043b\u0438\u0448\u0435 \u043e\u0434\u0438\u043d \u0431\u0456\u043a. \u0412\u0432\u0435\u0434\u0438 \u043e\u0431\u0438\u0434\u0432\u0430 \u0447\u0438\u0441\u043b\u0430 (\u043d\u0430\u043f\u0440. 1:0) \u0430\u0431\u043e \u043e\u0447\u0438\u0441\u0442\u0438 \u043e\u0431\u0438\u0434\u0432\u0430 \u043f\u043e\u043b\u044f.');
+    return;
+  }
+
   if(!S.predictions[user])S.predictions[user]={};
   const pred=S.predictions[user];
   if(!pred.matches)pred.matches={};
@@ -3409,6 +3733,8 @@ function savePredictions(){
   savePredToSheets(user);
   const ok=document.getElementById('pred-ok');ok.style.display='inline';setTimeout(()=>ok.style.display='none',2000);
   toast('Прогноз збережено!');
+  // Перемальовуємо вміст, щоб підсумкові таблиці груп оновилися одразу
+  renderPredContent();
 }
 
 // Quick bonus save (used during re-render)
@@ -3550,7 +3876,7 @@ function renderAllPredsBody(){
       const teamPts={};
       allGroupMatches().forEach(m=>{
         const res=S.matches[m.id],p=pm[m.id];
-        if(!res||res.h===''||res.h===undefined||!p||p.h===''||p.h===undefined)return;
+        if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined||!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
         const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,S.scoring);
         const earned=sc.exact+sc.result+sc.diff;
         [m.home.n,m.away.n].forEach(tn=>{if(!teamPts[tn])teamPts[tn]=0;teamPts[tn]+=earned;});
@@ -3563,11 +3889,11 @@ function renderAllPredsBody(){
       Object.keys(GROUPS).forEach(g=>{
         const realT=getRealRankedGroups()[g]||[];
         const predT=getRankedGroups(pm, pred.groupRanks||{})[g]||[];
-        const hasR=realT.some(t=>t.p>0);
+        const hasR=isGroupFullyPlayed(g);
         let gt=0;
         MATCH_PAIRS.forEach((_,k)=>{
           const mid='g'+g+k,res=S.matches[mid],pp=pm[mid];
-          if(!res||res.h===''||res.h===undefined||!pp||pp.h===''||pp.h===undefined)return;
+          if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined||!pp||pp.h===''||pp.h===undefined||pp.a===''||pp.a===undefined)return;
           const sc=scoreMatch(+res.h,+res.a,+pp.h,+pp.a,S.scoring);
           gt+=sc.exact+sc.result+sc.diff;
         });
@@ -3715,7 +4041,7 @@ function renderAllPredsBody(){
     const realRankedAll=getRealRankedGroups();
     Object.entries(predRanked).forEach(([g,teams])=>{
       const realTeams=realRankedAll[g]||[];
-      const hasReal=realTeams.length>0&&realTeams.some(t=>t.p>0);
+      const hasReal=isGroupFullyPlayed(g);
       html+=`<div class="card-sm"><div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin-bottom:8px">ГРУПА ${g}</div>`;
       html+=`<table style="width:100%;font-size:11px;border-collapse:collapse">`;
       html+=`<tr style="border-bottom:1px solid var(--border)">
@@ -4878,7 +5204,7 @@ function renderAwards(){
       MATCH_PAIRS.forEach(([,],k)=>{
         const mid=`g${g}${k}`;
         const res=S.matches[mid],p=(S.predictions[name]?.matches||{})[mid];
-        if(!res||res.h===''||res.h===undefined||!p||p.h===''||p.h===undefined)return;
+        if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined||!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
         const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,S.scoring);
         pts+=sc.exact+sc.result+sc.diff;
       });
@@ -5041,6 +5367,50 @@ function calcBalance(nameOrPts, allData, rate){
   }
   return 0;
 }
+// ── Рендер секції «Каси» (4 окремі zero-sum пули) ──────────────────
+// Кожна каса: свої учасники, свій zero-sum баланс. Порожні не показуємо.
+function renderPoolTables(){
+  const host=document.getElementById('lb-pools-section');
+  if(!host)return;
+  const curr=S.currency||{code:'UAH',rate:1};
+  const rate=curr.rate||1, code=curr.code||'UAH';
+
+  function poolTable(title, hint, members, ptsField){
+    if(!members||members.length===0)return '';
+    const balMap=calcPoolBalances(members, ptsField, rate); // один раз на касу
+    const rows=members.map(n=>({n, pts:calcPts(n)[ptsField]||0}))
+                      .sort((a,b)=>b.pts-a.pts);
+    const maxPts=rows[0]?.pts||1;
+    const body=rows.map((row,i)=>{
+      const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
+      const bal=balMap.get(row.n)||0;
+      const balEl=bal>=0?`<td class="uah-pos">+${bal} ${code}</td>`:`<td class="uah-neg">${bal} ${code}</td>`;
+      const pct=Math.round((row.pts/maxPts)*100);
+      return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
+        <td class="pts-cell">${row.pts}</td>${balEl}
+        <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td></tr>`;
+    }).join('');
+    return `<div style="margin-top:2rem">
+      <div class="sec-title" style="font-size:18px">${title}</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hint} · ${members.length} уч. · zero-sum</p>
+      <div class="lb-wrap"><table class="lb-table">
+        <thead><tr><th>#</th><th>Учасник</th><th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>
+        <tbody>${body}</tbody>
+      </table></div></div>`;
+  }
+
+  const gM=poolMembers(inGroupPool);
+  const pM=poolMembers(inPlayoffPool);
+  const nM=poolMembers(inNomPool);
+
+  let out='';
+  out+=poolTable('🥅 Каса: Груповий етап','Хто заповнив усі матчі груп', gM, 'poolGroup');
+  out+=poolTable('🏟️ Каса: Плей-оф','Хто заповнив фінал і матч за 3-тє', pM, 'poolPlayoff');
+  out+=poolTable('🏅 Каса: Номінації','Хто заповнив усі номінації', nM, 'poolNoms');
+
+  host.innerHTML=out;
+}
+
 function renderLeaderboard(){
   const curr=S.currency||{code:'UAH',rate:1};
   const data=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
@@ -5060,6 +5430,9 @@ function renderLeaderboard(){
       <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
     </tr>`;
   }).join('');
+
+  // ── Секція «Каси» (4 окремі zero-sum пули) ──
+  renderPoolTables();
 
   // Bonus leaderboard
   const bonusSection=document.getElementById('lb-bonus-section');
@@ -5129,9 +5502,10 @@ function renderLeaderboard(){
           const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
           const combined=p.total+p.bonusPts;
           const pct=Math.round(combined/combinedMax*100);
-          // Combined balance: main balance + bonus balance (if participant)
+          // Баланс: основний (від загальних очок) + бонусний (окрема каса)
           const mainBal=calcBalance(p.n, allPart, mainRate);
-          const bonusBal=bonusParticipants.includes(p.n)?calcBonusBalance(p.n,bonusParticipants):0;
+          const bonusParts2=getBonusParticipants();
+          const bonusBal=bonusParts2.includes(p.n)?calcBonusBalance(p.n,bonusParts2):0;
           const totalBal=mainBal+bonusBal;
           const balEl=totalBal>=0?`<td class="uah-pos">+${totalBal} ${bCode}</td>`:`<td class="uah-neg">${totalBal} ${bCode}</td>`;
           return`<tr>
@@ -5358,6 +5732,98 @@ function setAResGroup(g,el){
     if(el2)el2.innerHTML=buildAResultsGroupHTML();
   }
 }
+// ── LIVE: показ прогнозів усіх учасників на матч, що йде ──────────────
+// Адмін позначає матч «🔴 LIVE» → точкове розкриття прогнозів цього матчу
+// (навіть якщо загальне розкриття S.predsVisible вимкнене).
+function toggleLive(mid){
+  if(!Array.isArray(S.liveMatches))S.liveMatches=[];
+  const i=S.liveMatches.indexOf(mid);
+  if(i>=0)S.liveMatches.splice(i,1);
+  else S.liveMatches.push(mid);
+  save();
+  toast(i>=0?'Матч прибрано з LIVE':'Матч у LIVE — прогнози видно всім');
+  // Перемалювати адмін-екран (кнопка) і навігацію (вкладка Live)
+  if(typeof syncLiveTab==='function')syncLiveTab();
+  const el2=document.getElementById('ares-content');
+  if(el2)el2.innerHTML=buildAResultsGroupHTML();
+}
+// Інфо про груповий матч за його id (команди). Повертає null для не-групового.
+function liveMatchInfo(mid){
+  const m=/^g([A-Z])(\d+)$/.exec(mid);
+  if(!m)return null;
+  const g=m[1], k=+m[2];
+  const gd=GROUPS[g]; if(!gd)return null;
+  const pair=MATCH_PAIRS[k]; if(!pair)return null;
+  return {g, k, home:gd.teams[pair[0]], away:gd.teams[pair[1]], id:mid};
+}
+// Показати/сховати вкладку Live залежно від наявності активних матчів
+function syncLiveTab(){
+  const tab=document.getElementById('nav-live-tab');
+  if(!tab)return;
+  const on=Array.isArray(S.liveMatches)&&S.liveMatches.length>0;
+  tab.style.display=on?'':'none';
+}
+function renderLive(){
+  const el=document.getElementById('live-content');
+  if(!el)return;
+  const ids=(S.liveMatches||[]).filter(mid=>liveMatchInfo(mid));
+  if(ids.length===0){
+    el.innerHTML='<div style="text-align:center;padding:3rem 1rem;color:var(--muted)">'+
+      '<div style="font-size:32px;margin-bottom:.5rem">📺</div>'+
+      '<div style="font-weight:700;font-size:15px;margin-bottom:.3rem">Зараз немає матчів у LIVE</div>'+
+      '<div style="font-size:13px">Коли адмін позначить матч «🔴 LIVE», тут будуть прогнози всіх учасників на цей матч.</div>'+
+      '</div>';
+    return;
+  }
+  let html='';
+  ids.forEach(mid=>{
+    const info=liveMatchInfo(mid);
+    const res=S.matches[mid];
+    const live=res&&res.h!==''&&res.h!==undefined?(res.h+':'+res.a):'— : —';
+    html+='<div style="margin-bottom:1.5rem;background:var(--bg2);border:1px solid rgba(255,107,107,.3);border-radius:12px;overflow:hidden">';
+    html+='<div style="background:rgba(192,57,43,.15);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+    html+='<div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px"><span style="color:#ff6b6b">🔴 LIVE</span> '+flag(info.home.iso)+escapeHtml(info.home.n)+' — '+flag(info.away.iso)+escapeHtml(info.away.n)+'</div>';
+    html+='<div style="font-family:\'Bebas Neue\';font-size:24px;color:var(--gold)">'+live+'</div>';
+    html+='</div>';
+    // Збираємо прогнози всіх учасників на цей матч
+    const rows=[];
+    (S.participants||[]).forEach(n=>{
+      const p=((S.predictions[n]||{}).matches||{})[mid];
+      if(p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined){
+        rows.push({n, h:+p.h, a:+p.a});
+      }
+    });
+    if(rows.length===0){
+      html+='<div style="padding:1rem;color:var(--muted);font-size:13px">Ніхто не зробив прогноз на цей матч.</div>';
+    } else {
+      // Якщо матч уже має рахунок — підсвітимо тих, хто вгадав
+      const hasRes=res&&res.h!==''&&res.h!==undefined;
+      // Сортуємо: спочатку точні влучення, потім решта
+      rows.sort((x,y)=>{
+        const xe=hasRes&&x.h===+res.h&&x.a===+res.a?0:1;
+        const ye=hasRes&&y.h===+res.h&&y.a===+res.a?0:1;
+        return xe-ye || x.n.localeCompare(y.n);
+      });
+      html+='<div style="padding:.5rem 0">';
+      rows.forEach(r=>{
+        let mark='', col='var(--text)';
+        if(hasRes){
+          if(r.h===+res.h&&r.a===+res.a){mark=' ✓'; col='var(--green2)';}
+          else{const rd=Math.sign(r.h-r.a), ad=Math.sign(+res.h-+res.a); if(rd===ad){mark=' ≈'; col='var(--gold)';}}
+        }
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
+        html+='<span style="font-size:14px;font-weight:600;color:'+col+'">'+escapeHtml(r.n)+mark+'</span>';
+        html+='<span style="font-family:\'Bebas Neue\';font-size:20px;color:'+col+'">'+r.h+' : '+r.a+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+      html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">'+rows.length+' прогноз(ів)'+(hasRes?' · ✓ точний, ≈ вгадав результат':'')+'</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
 function buildAGroupMatchRows(g){
   const gd=GROUPS[g];
   let html=`<div id="ares-matches">`;
@@ -5377,6 +5843,7 @@ function buildAGroupMatchRows(g){
       </div>
       <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px">
         ${done?`<span style="font-size:11px;color:var(--green2)">✓ ${res.h}:${res.a}</span>`:''}
+        <button class="btn btn-sm" onclick="toggleLive('${mid}')" title="Показати прогнози всіх на цей матч у реальному часі" style="${(S.liveMatches||[]).includes(mid)?'background:#c0392b;color:#fff;border-color:#c0392b':'background:transparent;color:#ff6b6b;border:1px solid rgba(255,107,107,.4)'}">${(S.liveMatches||[]).includes(mid)?'🔴 LIVE — зупинити':'🔴 LIVE'}</button>
         ${done?`<button class="btn btn-ghost btn-sm" onclick="clearResInline('${mid}')" title="Видалити результат" style="color:#ff6b6b;border-color:rgba(255,107,107,.3)">✕</button>`:''}
         <button class="btn btn-red btn-sm" onclick="saveResInline('${mid}')">Зберегти</button>
         <span id="ok-${mid}" style="display:none" class="save-ok">✓</span>
@@ -5867,7 +6334,8 @@ function saveBonus(){
       S.bonusRound.slots[mid]={home:h,away:a};
     }
   });
-  save();document.getElementById('brok').style.display='inline';setTimeout(()=>document.getElementById('brok').style.display='none',2000);toast('Збережено!');}
+  save();document.getElementById('brok').style.display='inline';setTimeout(()=>document.getElementById('brok').style.display='none',2000);toast('Збережено!');
+  if(typeof syncBracketBonusTab==='function')syncBracketBonusTab();}
 
 
 function aNomWinners(){
@@ -6162,7 +6630,7 @@ function importData(input){
       }
       // Безпечне злиття: оновлюємо тільки відомі ключі, не мутуємо невідомі
       const ALLOWED_KEYS=['participants','scoring','currency','nominations',
-        'matches','predictions','predsVisible','bonusRound','thirdPlaces',
+        'matches','predictions','predsVisible','liveMatches','bonusRound','thirdPlaces',
         'playoffSlots','playoffTeams','manualGroupRanks','pin','lang',
         'deadline','bonusDeadline'];
       ALLOWED_KEYS.forEach(k=>{if(k in data) S[k]=data[k];});
@@ -6411,14 +6879,16 @@ function runTests() {
     S.matches = {
       'final_0': {h:2, a:1}
     };
-    // Анна прогнозувала Аргентину чемпіоном
+    // НОВЕ ПРАВИЛО: плей-оф бали (включно з чемпіоном) нараховуються лише якщо
+    // учасник заповнив плей-оф повністю (final_0 + third_0). Тому даємо обом
+    // гравцям рахунки final_0 і third_0, щоб вони були в касі плей-оф.
     S.predictions = {
       'Анна': {
-        matches: {},
+        matches: {'final_0':{h:2,a:1}, 'third_0':{h:1,a:0}},
         playoffs: {champion: 'Аргентина'}
       },
       'Богдан': {
-        matches: {},
+        matches: {'final_0':{h:1,a:2}, 'third_0':{h:1,a:0}},
         playoffs: {champion: 'Іспанія'}
       },
       'Віка': {matches: {}}
@@ -6580,6 +7050,105 @@ function runTests() {
       'adminUnlocked не має потрапити в S через імпорт');
   });
 
+  // ── Test 10 ────────────────────────────────────────────────────────
+  // Плей-оф бали нараховуються лише при повному заповненні плей-оф
+  // (final_0 + third_0). Хто заповнив тільки групи — 0 за весь плей-оф,
+  // навіть якщо 1/16 деривується з груп.
+  test('10. Плей-оф бали лише при заповненому плей-оф (final_0+third_0)', () => {
+    S = baseState();
+    const r32 = getRealR32Slots();
+    const home = r32[0].home, away = r32[0].away;
+    S.playoffSlots = {'final_0':{home:'Аргентина',away:'Франція'}, 'r32_0':{home,away}};
+    S.playoffTeams = {r32:[home,away]};
+    S.matches = {'final_0':{h:2,a:1}, 'r32_0':{h:1,a:0}};
+    S.predictions = {
+      // повний плей-оф → у касі, бали капають
+      'Повний':{matches:{'r32_0':{h:1,a:0},'final_0':{h:2,a:1},'third_0':{h:1,a:0}},playoffs:{champion:'Аргентина'}},
+      // тільки групи → 0 за весь плей-оф
+      'Групник':{matches:{},playoffs:{champion:'Аргентина'}}
+    };
+    const full = calcDetailedPts('Повний');
+    const grp = calcDetailedPts('Групник');
+    const r1 = expect(full.champ===15 && full.r32>0,
+      `Повний має набирати плей-оф: champ=${full.champ}, r32=${full.r32}`);
+    if (r1) return r1;
+    return expect(grp.poolPlayoff===0 && grp.r32===0 && grp.champ===0 && grp.matchPtsPlayoff===0,
+      `Групник має 0 за плей-оф: poolPlayoff=${grp.poolPlayoff}, r32=${grp.r32}, champ=${grp.champ}, matchPtsPlayoff=${grp.matchPtsPlayoff}`);
+  });
+
+  // ── Test 11 ────────────────────────────────────────────────────────
+  // Каса групового етапу вимагає заповнення УСІХ групових матчів.
+  test('11. Каса груп — лише при заповненні ВСІХ групових матчів', () => {
+    S = baseState();
+    const gm = allGroupMatches();
+    const full = {}; gm.forEach(m => full[m.id] = {h:'1',a:'0'});
+    const almost = {}; gm.forEach((m,i) => { if(i>0) almost[m.id] = {h:'1',a:'0'}; });
+    S.predictions = {
+      'Повний': {matches: full},
+      'Майже': {matches: almost},
+      'Порожній': {matches: {}}
+    };
+    const r1 = expect(inGroupPool('Повний')===true,
+      'Повний (усі матчі) має бути в касі груп');
+    if (r1) return r1;
+    const r2 = expect(inGroupPool('Майже')===false,
+      `Майже (${gm.length-1}/${gm.length}) НЕ має бути в касі груп`);
+    if (r2) return r2;
+    const r3 = expect(groupMatchesLeft('Майже')===1,
+      `Майже: залишилось має бути 1, отримано ${groupMatchesLeft('Майже')}`);
+    if (r3) return r3;
+    return expect(inGroupPool('Порожній')===false,
+      'Порожній НЕ має бути в касі груп');
+  });
+
+  // ── Test 12 ────────────────────────────────────────────────────────
+  // Бали за місце/очки/різницю в групі — лише коли ВСЯ група дограна.
+  // Допоки група не завершена — рахуються тільки бали за рахунки.
+  test('12. Групові бали (місце/очки/різниця) лише коли група дограна', () => {
+    S = baseState();
+    // Частково зіграна група A: лише 5 з 6 матчів (gA5 відсутній)
+    S.matches = {
+      'gA0':{h:2,a:0}, 'gA1':{h:1,a:1}, 'gA2':{h:3,a:1},
+      'gA3':{h:0,a:2}, 'gA4':{h:1,a:0}
+      // gA5 НЕ зіграний
+    };
+    S.predictions = {'Анна': {matches: {...S.matches}}};
+    const partial = calcDetailedPts('Анна');
+    const r1 = expect(partial.groupPts===0,
+      `Група недограна → groupPts має бути 0, отримано ${partial.groupPts}`);
+    if (r1) return r1;
+    const r2 = expect(partial.matchPts>0,
+      `Бали за рахунки мають нараховуватись навіть у недограній групі, отримано ${partial.matchPts}`);
+    if (r2) return r2;
+    // Тепер догруємо групу (додаємо gA5) → групові бали з'являються
+    S.matches['gA5']={h:2,a:1};
+    S.predictions['Анна'].matches['gA5']={h:2,a:1};
+    const full = calcDetailedPts('Анна');
+    return expect(full.groupPts>0,
+      `Група дограна → groupPts має бути >0, отримано ${full.groupPts}`);
+  });
+
+  // ── Test 13 ────────────────────────────────────────────────────────
+  // Напівзаповнений матч (1: без другого боку) НЕ рахується як 1:0
+  // і не дає балів, і не псує таблицю.
+  test('13. Напівзаповнений матч не рахується і не дає балів', () => {
+    S = baseState();
+    const gm0 = allGroupMatches()[0];
+    S.matches = {[gm0.id]:{h:1,a:0}}; // реальний результат 1:0
+    S.predictions = {
+      // Повний коректний прогноз 1:0 → 3 бали
+      'Повний': {matches: {[gm0.id]:{h:'1',a:'0'}}},
+      // Напівзаповнений: тільки home=1, away порожній → НЕ має дати балів
+      'Напів': {matches: {[gm0.id]:{h:'1',a:''}}}
+    };
+    const full = calcDetailedPts('Повний');
+    const half = calcDetailedPts('Напів');
+    const r1 = expect(full.matchPts===3, `Повний 1:0 точний → 3, отримано ${full.matchPts}`);
+    if (r1) return r1;
+    return expect(half.matchPts===0,
+      `Напівзаповнений (1:) НЕ має давати балів, отримано ${half.matchPts}`);
+  });
+
   // ── RENDER RESULTS ─────────────────────────────────────────────────
   const passed = results.filter(r=>r.ok).length;
   const failed = results.length - passed;
@@ -6625,6 +7194,7 @@ if (isTestMode) {
   document.getElementById('lang-sel').value=lang;
   applyI18n();
   renderHome();
+  if(typeof syncLiveTab==='function')syncLiveTab();
   // Завантажуємо актуальні дані з Sheets (асинхронно)
   loadFromSheets().then(ok=>{
     if(ok){
@@ -6633,6 +7203,7 @@ if (isTestMode) {
       if(!S.currency)S.currency={code:'UAH',rate:1};
       lang=S.lang||'uk';
       renderHome();
+      if(typeof syncLiveTab==='function')syncLiveTab();
     }
   });
 

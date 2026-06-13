@@ -1140,6 +1140,10 @@ let S=JSON.parse(localStorage.getItem(KEY)||'null')||{
 // Це не захист (PIN легко обійти через DevTools), але чесна поведінка:
 // адмін-режим не "залишається відкритим" після закриття вкладки.
 let adminUnlocked=false;
+// Прапорець: чи завершилося початкове завантаження з Sheets.
+// Поки false — забороняємо записи, щоб порожній/застарілий рендер
+// не перезаписав реальні дані (race condition при старті).
+let sheetsLoaded=false;
 function save(){
   const {adminUnlocked:_skip,...rest}=S;
   // 1. Завжди зберігаємо в localStorage як кеш
@@ -3644,6 +3648,25 @@ function onBonusInput(mid,home,away){
 function savePredictions(){
   const user=document.getElementById('pred-user').value;
   if(!user){toast('Спочатку обери ім\'я');return;}
+  // ── GUARD дедлайнів: запобігаємо затиранню прогнозу після дедлайну ──
+  // Перевіряємо ДО будь-якого читання DOM, щоб disabled/порожні інпути
+  // не перезаписали збережений прогноз (баг «прогноз злітає»).
+  var _pastMain=isPastDeadline()&&!adminUnlocked;
+  var _pastBonus=isPastBonusDeadline()&&!adminUnlocked;
+  if(predStage==='bonus'){
+    // На бонусній вкладці зберігаємо ЛИШЕ бонус і нічого більше.
+    if(_pastBonus){toast('🔒 Дедлайн бонусного раунду пройшов. Прогнози заморожені.');return;}
+    if(!(S.bonusRound&&S.bonusRound.active)){toast('Бонусний раунд неактивний');return;}
+    _saveBonusQuick(user);
+    save();
+    savePredToSheets(user);
+    var _okB=document.getElementById('pred-ok');if(_okB){_okB.style.display='inline';setTimeout(function(){_okB.style.display='none';},2000);}
+    toast('Бонусний прогноз збережено!');
+    renderPredContent();
+    return;
+  }
+  // Основний прогноз (групи/плей-оф/номінації) — лише до дедлайну.
+  if(_pastMain){toast('🔒 Дедлайн прогнозів пройшов. Прогнози заморожені.');return;}
   // ── Перевірка напівзаповнених матчів (заповнений лише один бік) ──
   var sideVals={};
   document.querySelectorAll('#pred-content .pred-si').forEach(function(inp){
@@ -7197,6 +7220,7 @@ if (isTestMode) {
   if(typeof syncLiveTab==='function')syncLiveTab();
   // Завантажуємо актуальні дані з Sheets (асинхронно)
   loadFromSheets().then(ok=>{
+    sheetsLoaded=true;
     if(ok){
       // Після завантаження з Sheets — оновлюємо UI
       if(S.predsVisible===undefined)S.predsVisible=false;
@@ -7205,7 +7229,9 @@ if (isTestMode) {
       renderHome();
       if(typeof syncLiveTab==='function')syncLiveTab();
     }
-  });
+    // Якщо учасник зараз на сторінці прогнозу — перемальовуємо вже з реальними даними
+    if(typeof renderPredContent==='function'){var pc=document.getElementById('pred-content');if(pc)renderPredContent();}
+  }).catch(function(){sheetsLoaded=true;});
 
   // Auto-save playoff draw winner on radio click (no need to press "Зберегти")
   document.getElementById('pred-content').addEventListener('change',function(e){
@@ -7213,6 +7239,11 @@ if (isTestMode) {
     if(!radio.dataset.winner)return;
     var user=document.getElementById('pred-user').value;
     if(!user)return;
+    // GUARD: не зберігати до завершення завантаження з Sheets (race),
+    // не зберігати після дедлайну, і лише авторизований учасник.
+    if(!sheetsLoaded)return;
+    if(isPastDeadline()&&!adminUnlocked){toast('🔒 Дедлайн прогнозів пройшов');return;}
+    if(unlockedUser!==user&&!adminUnlocked)return;
     if(!S.predictions[user])S.predictions[user]={};
     var pred=S.predictions[user];
     if(!pred.matches)pred.matches={};

@@ -5876,8 +5876,12 @@ function renderLive(){
     // Підсвітка влучень
     function markFor(pr){
       if(!pr||!hasRes)return {mark:'',col:'var(--text)'};
+      // Точний рахунок
       if(pr.h===+res.h&&pr.a===+res.a)return {mark:' ✓',col:'var(--green2)'};
       const rd=Math.sign(pr.h-pr.a), ad=Math.sign(+res.h-+res.a);
+      // Вгадана РІЗНИЦЯ голів (і напрямок) — окремий, вищий рівень за просто напрямок
+      if(rd===ad&&(pr.h-pr.a)===(+res.h-+res.a))return {mark:' ±',col:'#7fd1ff'};
+      // Лише напрямок (хто виграв/нічия)
       if(rd===ad)return {mark:' ≈',col:'var(--gold)'};
       return {mark:'',col:'var(--text)'};
     }
@@ -5909,7 +5913,7 @@ function renderLive(){
       });
       html+='</div>';
       const baseCnt=rows.filter(r=>r.base).length, bonusCnt=rows.filter(r=>r.bonus).length;
-      html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">📅 '+baseCnt+' · 🎯 '+bonusCnt+(hasRes?' · ✓ точний, ≈ вгадав результат':'')+'</div>';
+      html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">📅 '+baseCnt+' · 🎯 '+bonusCnt+(hasRes?' · ✓ точний · ± різниця · ≈ напрямок':'')+'</div>';
     } else {
       // ── Одна каса (як раніше): лише основний прогноз ──
       const single=rows.filter(r=>r.base).map(r=>({n:r.n,h:r.base.h,a:r.base.a}));
@@ -5930,7 +5934,7 @@ function renderLive(){
           html+='</div>';
         });
         html+='</div>';
-        html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">'+single.length+' прогноз(ів)'+(hasRes?' · ✓ точний, ≈ вгадав результат':'')+'</div>';
+        html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">'+single.length+' прогноз(ів)'+(hasRes?' · ✓ точний · ± різниця · ≈ напрямок':'')+'</div>';
       }
     }
     html+='</div>';

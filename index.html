@@ -926,7 +926,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       <th class="r" data-i18n="col_noms">Номін.</th>
       <th class="r" data-i18n="col_total">Очки</th>
       <th class="r" data-i18n="col_balance">Баланс</th>
-      <th></th>
+      <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
     </tr></thead>
     <tbody id="lb-body"></tbody>
   </table></div>
@@ -1427,6 +1427,40 @@ function calcDetailedPts(name){
 }
 
 function calcPts(name){return calcDetailedPts(name);}
+
+// % влучності матчевих прогнозів: скільки зіграних матчів з прогнозом дали
+// бодай якесь очко (точний рахунок / різниця / результат) — з усіх зіграних,
+// де гравець залишив прогноз. Групи + плей-оф (матчеві), без балів за таблиці.
+// Повертає {hit, total, pct} або null якщо немає жодного зіграного матчу з прогнозом.
+function matchAccuracy(name){
+  const s=S.scoring, pred=S.predictions[name]||{}, pm=pred.matches||{};
+  let hit=0, total=0;
+  function consider(mid, predScore){
+    const res=S.matches[mid];
+    if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined)return;
+    if(!predScore||predScore.h===''||predScore.h===undefined||predScore.a===''||predScore.a===undefined)return;
+    total++;
+    const sc=scoreMatch(+res.h,+res.a,+predScore.h,+predScore.a,s);
+    if(sc.exact||sc.result||sc.diff)hit++;
+  }
+  // Групові матчі — прямий збіг id
+  allGroupMatches().forEach(m=>consider(m.id, pm[m.id]));
+  // Плей-оф матчі — прогноз за сіткою гравця, лише якщо пара співпала
+  PLAYOFF_ROUNDS.forEach(round=>{
+    let slots=[];
+    try{slots=getPredSlotsForRound(round.id,pred);}catch(e){slots=[];}
+    for(let i=0;i<round.n;i++){
+      const mid=poId(round.id,i);
+      const real=(S.playoffSlots||{})[mid];
+      const slot=slots[i];
+      if(!real||!slot)continue;
+      const pairOk=(slot.home===real.home&&slot.away===real.away)||(slot.home===real.away&&slot.away===real.home);
+      if(pairOk)consider(mid, pm[mid]);
+    }
+  });
+  if(total===0)return null;
+  return {hit, total, pct:Math.round(hit/total*100)};
+}
 
 // ══════════════════════════════════════════════════════════════════
 // 4 ОКРЕМІ КАСИ (pools) — критерії участі + zero-sum баланс
@@ -5572,7 +5606,6 @@ function renderPoolTables(){
       const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
       const bal=balMap.get(row.n)||0;
       const balEl=bal>=0?`<td class="uah-pos">+${bal} ${code}</td>`:`<td class="uah-neg">${bal} ${code}</td>`;
-      const pct=Math.round((row.pts/maxPts)*100);
       let bd='';
       if(breakdown){
         const d=row.det;
@@ -5581,9 +5614,12 @@ function renderPoolTables(){
         bd=bc(d.exactCount||0)+bc(d.diffCount||0)+bc(d.resultCount||0)
           +bc(d.groupPtsCount||0)+bc(d.goalDiffCount||0)+bc(d.placeCount||0);
       }
+      let accCell='<td class="r" style="color:var(--muted)">·</td>';
+      const acc=matchAccuracy(row.n);
+      if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
         ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
-        <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td></tr>`;
+        ${accCell}</tr>`;
     }).join('');
     let bhead='';
     if(breakdown){
@@ -5619,7 +5655,7 @@ function renderPoolTables(){
       ${infoBlock}
       ${scrollHint}
       <div class="${wrapCls}"><table class="lb-table">
-        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th></tr></thead>
         <tbody>${body}</tbody>
       </table></div></div>`;
   }
@@ -5644,7 +5680,6 @@ function renderLeaderboard(){
     const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
     const bal=calcBalance(p.n, data, curr.rate);
     const balEl=bal>=0?`<td class="uah-pos">+${bal} ${curr.code}</td>`:`<td class="uah-neg">${bal} ${curr.code}</td>`;
-    const pct=Math.round(p.total/max*100);
     return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell" style="cursor:pointer" title="Сценарій: якщо все складеться для цього гравця" onclick="renderScenario('${p.n.replace(/'/g,"\\'")}');document.getElementById('lb-scenario-section')?.scrollIntoView({behavior:'smooth'})">${p.n}</td>
       <td class="sub-cell">${p.matchPts}</td><td class="sub-cell">${p.groupPts}</td>
       <td class="sub-cell">${p.r32}</td><td class="sub-cell">${p.r16}</td>
@@ -5652,7 +5687,7 @@ function renderLeaderboard(){
       <td class="sub-cell">${p.fin}</td><td class="sub-cell">${p.champ}</td>
       <td class="sub-cell">${p.nomPts}</td>
       <td class="pts-cell">${p.total}</td>${balEl}
-      <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
+      ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
     </tr>`;
   }).join('');
 
@@ -5688,14 +5723,12 @@ function renderLeaderboard(){
           <th class="r">Номін.</th>
           <th class="r">Очки</th>
           <th class="r">Баланс</th>
-          <th></th>
         </tr></thead>
         <tbody>${bData.map((p,i)=>{
           const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
           const bd=p.bonusDetail||{};
           const bal=calcBonusBalance(p.n,bonusParticipants);
           const balEl=bal>=0?`<td class="uah-pos">+${bal} ${bCode}</td>`:`<td class="uah-neg">${bal} ${bCode}</td>`;
-          const pct=Math.round(p.bonusPts/bMax*100);
           return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${p.n}</td>
             <td class="sub-cell">${(bd.bExact||0)+(bd.bResult||0)>0?(bd.bExact||0)*3+(bd.bResult||0):0}</td>
             <td class="sub-cell">${bd.bR16||0}</td>
@@ -5703,7 +5736,6 @@ function renderLeaderboard(){
             <td class="sub-cell">${bd.bFin||0}</td><td class="sub-cell">${bd.bChamp||0}</td>
             <td class="sub-cell">${bd.bNom||0}</td>
             <td class="pts-cell">${p.bonusPts}</td>${balEl}
-            <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>
@@ -5726,12 +5758,11 @@ function renderLeaderboard(){
           <th class="r">Бонус</th>
           <th class="r" style="color:var(--gold)">Всього</th>
           <th class="r">Баланс</th>
-          <th></th>
+          <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
         </tr></thead>
         <tbody>${allPart.map((p,i)=>{
           const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
           const combined=p.total+p.bonusPts;
-          const pct=Math.round(combined/combinedMax*100);
           // Баланс: основний (від загальних очок) + бонусний (окрема каса)
           const mainBal=calcBalance(p.n, allPart, mainRate);
           const bonusParts2=getBonusParticipants();
@@ -5745,7 +5776,7 @@ function renderLeaderboard(){
             <td class="sub-cell" style="color:var(--blue3)">${p.bonusPts||0}</td>
             <td class="pts-cell" style="color:var(--gold)">${combined}</td>
             ${balEl}
-            <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
+            ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
           </tr>`;
         }).join('')}</tbody>
       </table></div>

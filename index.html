@@ -3306,8 +3306,8 @@ function renderPredGroup(pred,dis,el){
         // Format ✓≈~ cell
         var guessCell='';
         if(tExact)guessCell+='<span style="color:var(--green2)">'+tExact+'✓</span> ';
-        if(tDiff)guessCell+='<span style="color:#f0a500">'+tDiff+'≈</span> ';
-        if(tResult)guessCell+='<span style="color:var(--gold)">'+tResult+'~</span>';
+        if(tDiff)guessCell+='<span style="color:#ff9500">'+tDiff+'≈</span> ';
+        if(tResult)guessCell+='<span style="color:#5b9fd4">'+tResult+'~</span>';
         if(!guessCell)guessCell='<span style="color:var(--dim)">—</span>';
 
         html+='<tr style="'+rowBg+';border-bottom:1px solid rgba(255,255,255,.04)">';
@@ -3342,8 +3342,8 @@ function renderPredGroup(pred,dis,el){
         var cols=hasReal?7:6;
         var parts=[];
         if(grpExact>0)parts.push('<span style="color:var(--green2)">✓'+grpExact+'</span>');
-        if(grpDiff>0)parts.push('<span style="color:#f0a500">≈'+grpDiff+'</span>');
-        if(grpResult>0)parts.push('<span style="color:var(--gold)">~'+grpResult+'</span>');
+        if(grpDiff>0)parts.push('<span style="color:#ff9500">≈'+grpDiff+'</span>');
+        if(grpResult>0)parts.push('<span style="color:#5b9fd4">~'+grpResult+'</span>');
         var mCol=grpTotal===grpMax&&grpMax>0?'var(--green2)':grpTotal>0?'var(--gold)':'var(--muted)';
         html+='<tr style="border-top:2px solid var(--border2);background:rgba(0,0,0,.12)">';
         html+='<td colspan="'+cols+'" style="padding:5px 4px;font-size:11px;line-height:1.6">';
@@ -4145,8 +4145,8 @@ function renderAllPredsBody(){
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="display:flex;gap:10px;font-size:11px">
               <span style="color:var(--green2)">✓ ${exact}</span>
-              <span style="color:#f0a500">≈ ${diff}</span>
-              <span style="color:var(--gold)">~ ${result}</span>
+              <span style="color:#ff9500">≈ ${diff}</span>
+              <span style="color:#5b9fd4">~ ${result}</span>
               <span style="color:#ff6b6b">✗ ${miss}</span>
               <span style="color:var(--muted)">із ${played}</span>
             </div>
@@ -4154,8 +4154,8 @@ function renderAllPredsBody(){
           </div>
           <div style="height:8px;border-radius:4px;background:rgba(255,107,107,.25);overflow:hidden;display:flex">
             <div style="width:${played?exact/played*100:0}%;background:var(--green2);transition:.3s"></div>
-            <div style="width:${played?diff/played*100:0}%;background:#f0a500;transition:.3s"></div>
-            <div style="width:${played?result/played*100:0}%;background:var(--gold);transition:.3s"></div>
+            <div style="width:${played?diff/played*100:0}%;background:#ff9500;transition:.3s"></div>
+            <div style="width:${played?result/played*100:0}%;background:#5b9fd4;transition:.3s"></div>
           </div>
         </div>
 
@@ -4216,8 +4216,8 @@ function renderAllPredsBody(){
       if(hasRes&&hasPred){
         const rH=+res.h,rA=+res.a,pH=+p.h,pA=+p.a;
         if(pH===rH&&pA===rA){col='var(--green2)';colLabel='✓';}          // exact score
-        else if((pH-pA)===(rH-rA)&&Math.sign(pH-pA)===Math.sign(rH-rA)){col='#f0a500';colLabel='≈';} // diff + result
-        else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='var(--gold)';colLabel='~';}  // result only
+        else if((pH-pA)===(rH-rA)&&Math.sign(pH-pA)===Math.sign(rH-rA)){col='#ff9500';colLabel='≈';} // diff + result
+        else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='#5b9fd4';colLabel='~';}  // result only
         else{col='#ff6b6b';colLabel='✗';}
       }
       // Per-match balance: sum of (myPts - theirPts) for each other participant
@@ -4338,8 +4338,8 @@ function renderAllPredsBody(){
         var cols=hasReal?6:5;
         var sumParts=[];
         if(mExact>0)sumParts.push('<span style="color:var(--green2)">✓'+mExact+'</span>');
-        if(mDiff>0)sumParts.push('<span style="color:#f0a500">≈'+mDiff+'</span>');
-        if(mResult>0)sumParts.push('<span style="color:var(--gold)">~'+mResult+'</span>');
+        if(mDiff>0)sumParts.push('<span style="color:#ff9500">≈'+mDiff+'</span>');
+        if(mResult>0)sumParts.push('<span style="color:#5b9fd4">~'+mResult+'</span>');
         var mCol=mTotal===mMax?'var(--green2)':mTotal>0?'var(--gold)':'var(--muted)';
         var grandTotal=mTotal+sExact+sDiff+sPlace;
         var grandMax=mMax+(4*(S.scoring.groupPts||1))+(4*(S.scoring.goalDiff||1))+(4*(S.scoring.place||1));
@@ -4547,8 +4547,8 @@ function renderAllPredsBody(){
             const pH=(predHome===realHome)?+p.h:+p.a;
             const pA=(predHome===realHome)?+p.a:+p.h;
             if(pH===rH&&pA===rA){col='var(--green2)';label='✓';}
-            else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#f0a500';label='≈';}
-            else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='var(--gold)';label='~';}
+            else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#ff9500';label='≈';}
+            else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='#5b9fd4';label='~';}
             else{col='#ff6b6b';label='✗';}
             const sc=scoreMatch(rH,rA,pH,pA,rScoring);
             rMatchPts+=sc.exact+sc.result+sc.diff;
@@ -4849,8 +4849,8 @@ function renderAllPredsBody(){
                 const sc=scoreMatch(rH,rA,pH,pA,{exact:br.ptsScore||3,result:br.ptsResult||1,diff:br.ptsDiff||0});
                 bMatchPts+=sc.exact+sc.result;
                 if(pH===rH&&pA===rA){col='var(--green2)';label='✓';}
-                else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#f0a500';label='≈';}
-                else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='var(--gold)';label='~';}
+                else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#ff9500';label='≈';}
+                else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='#5b9fd4';label='~';}
                 else{col='#ff6b6b';label='✗';}
               }
             }
@@ -5167,8 +5167,8 @@ function renderStatsContent(){
       <div class="card-title">Рахунки матчів</div>
       ${cardHead()}
       ${row3('Точних рахунків',d.exactCount,d.exactCount*s.exact,'var(--green2)')}
-      ${row3('Різниць голів',d.diffCount,d.diffCount*(s.diff+s.result),'#f0a500')}
-      ${row3('Правильних результатів',d.resultCount,d.resultCount*s.result,'var(--gold)')}
+      ${row3('Різниць голів',d.diffCount,d.diffCount*(s.diff+s.result),'#ff9500')}
+      ${row3('Правильних результатів',d.resultCount,d.resultCount*s.result,'#5b9fd4')}
       ${rowPts('Разом за рахунки',pts.matchPts)}
     </div>
     <div class="card">
@@ -5197,7 +5197,7 @@ function renderStatsContent(){
       <div class="card-title">Бонусний раунд</div>
       ${cardHead()}
       ${row3('Точних рахунків',bd.bExact,bd.bExact*(br.ptsScore||3),'var(--green2)')}
-      ${row3('Правильних результатів',bd.bResult,bd.bResult*(br.ptsResult||1),'var(--gold)')}
+      ${row3('Правильних результатів',bd.bResult,bd.bResult*(br.ptsResult||1),'#5b9fd4')}
       ${row3('1/8 фіналу',bd.bR16,bd.bR16,'var(--blue3)')}
       ${row3('1/4 фіналу',bd.bR8,bd.bR8,'var(--blue3)')}
       ${row3('1/2 фіналу',bd.bR4,bd.bR4,'var(--blue3)')}
@@ -5646,7 +5646,8 @@ function renderPoolTables(){
         +'У колонках — <b style="color:var(--text)">скільки разів вгадано</b>, а не очки. Очки за кожне: '
         +'<b style="color:var(--text)">Рахунок ×'+s.exact+'</b> · <b style="color:var(--text)">Різниця ×'+(s.diff+s.result)+'</b> · <b style="color:var(--text)">Результат ×'+s.result+'</b> · '
         +'<b style="color:var(--text)">Очки<sub>гр</sub> ×'+s.groupPts+'</b> · <b style="color:var(--text)">Різн.<sub>гр</sub> ×'+s.goalDiff+'</b> · <b style="color:var(--text)">Місце ×'+s.place+'</b>. '
-        +'Підсумок — у колонці <b style="color:var(--text)">«Очки»</b>. Категорії таблиці групи (Очки<sub>гр</sub>/Різн.<sub>гр</sub>/Місце) нараховуються лише після завершення всіх матчів групи.</div>';
+        +'Підсумок — у колонці <b style="color:var(--text)">«Очки»</b>. Категорії таблиці групи (Очки<sub>гр</sub>/Різн.<sub>гр</sub>/Місце) нараховуються лише після завершення всіх матчів групи. '
+        +'<b style="color:var(--text)">Влучність</b> — частка зіграних матчів (з прогнозом), де вгадано бодай щось (точний рахунок, різницю або напрямок).</div>';
     }
     const scrollHint=breakdown?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
     return `<div style="margin-top:2rem">
@@ -6066,8 +6067,8 @@ function renderLive(){
       // Єдина схема з рейтингами: ✓ точний · ≈ різниця · ~ напрямок · ✗ мимо
       if(pr.h===+res.h&&pr.a===+res.a)return {mark:' ✓',col:'var(--green2)'};
       const rd=Math.sign(pr.h-pr.a), ad=Math.sign(+res.h-+res.a);
-      if(rd===ad&&(pr.h-pr.a)===(+res.h-+res.a))return {mark:' ≈',col:'#f0a500'};
-      if(rd===ad)return {mark:' ~',col:'var(--gold)'};
+      if(rd===ad&&(pr.h-pr.a)===(+res.h-+res.a))return {mark:' ≈',col:'#ff9500'};
+      if(rd===ad)return {mark:' ~',col:'#5b9fd4'};
       return {mark:' ✗',col:'#ff6b6b'};
     }
     function cell(pr){

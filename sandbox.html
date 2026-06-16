@@ -70,6 +70,16 @@ nav{background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;
 .lb-table th.r{text-align:right;}
 .lb-table td{padding:11px 10px;border-bottom:1px solid var(--border);}
 .lb-table tr:hover td{background:rgba(255,255,255,.02);}
+/* Таблиця сценарію: природна ширина + горизонтальний скрол на вузьких екранах */
+.scen-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;}
+.scen-wrap .lb-table{width:auto;min-width:100%;}
+.scen-wrap .lb-table th,.scen-wrap .lb-table td{white-space:nowrap;}
+/* Липкі перші дві колонки (# та Учасник), щоб було видно чий рядок при скролі */
+.scen-wrap .lb-table th:nth-child(1),.scen-wrap .lb-table td:nth-child(1){position:sticky;left:0;background:var(--card);z-index:2;}
+.scen-wrap .lb-table th:nth-child(2),.scen-wrap .lb-table td:nth-child(2){position:sticky;left:36px;background:var(--card);z-index:2;}
+.scen-wrap .lb-table tr:hover td:nth-child(1),.scen-wrap .lb-table tr:hover td:nth-child(2){background:var(--card);}
+.scen-hint{font-size:11px;color:var(--muted);margin-bottom:.4rem;display:none;}
+@media(max-width:640px){.scen-hint{display:block;}}
 .rank-cell{font-family:'Bebas Neue';font-size:20px;width:36px;}
 .gold-rank{color:var(--gold);}
 .silver-rank{color:#aab8c2;}
@@ -1673,7 +1683,8 @@ function renderScenario(name){
     return '<td class="pts-cell">'+d.pts+'</td><td class="'+balCls+'">'+balStr+'</td>';
   }
 
-  out+='<div class="lb-wrap"><table class="lb-table"><thead><tr>'+head+'</tr></thead><tbody>';
+  out+='<div class="scen-hint">← гортайте таблицю вбік, щоб побачити всі каси →</div>';
+  out+='<div class="scen-wrap"><table class="lb-table"><thead><tr>'+head+'</tr></thead><tbody>';
   rowsAll.forEach((n,i)=>{
     const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
     const isX=n===name;

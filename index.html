@@ -5576,14 +5576,10 @@ function renderPoolTables(){
       let bd='';
       if(breakdown){
         const d=row.det;
-        const pExact=(d.exactCount||0)*s.exact;
-        const pDiff=(d.diffCount||0)*(s.diff+s.result); // різниця включає результат
-        const pResult=(d.resultCount||0)*s.result;
-        const pGr=(d.groupPtsCount||0)*s.groupPts;
-        const pGd=(d.goalDiffCount||0)*s.goalDiff;
-        const pPl=(d.placeCount||0)*s.place;
-        function bc(v){return v>0?`<td class="sub-cell">${v}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;}
-        bd=bc(pExact)+bc(pDiff)+bc(pResult)+bc(pGr)+bc(pGd)+bc(pPl);
+        // У колонках — КІЛЬКІСТЬ вгаданого (не очки). Очки — у підсумковій колонці.
+        function bc(cnt){return cnt>0?`<td class="sub-cell">${cnt}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;}
+        bd=bc(d.exactCount||0)+bc(d.diffCount||0)+bc(d.resultCount||0)
+          +bc(d.groupPtsCount||0)+bc(d.goalDiffCount||0)+bc(d.placeCount||0);
       }
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
         ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
@@ -5591,19 +5587,36 @@ function renderPoolTables(){
     }).join('');
     let bhead='';
     if(breakdown){
-      bhead='<th class="r" title="Точний рахунок матчу">Рахунок</th>'
-        +'<th class="r" title="Вгадана різниця голів у матчі">Різниця</th>'
-        +'<th class="r" title="Вгаданий результат матчу (напрямок)">Результат</th>'
-        +'<th class="r" title="Вгадані очки команди в групі (після завершення групи)">Очки<sub>гр</sub></th>'
-        +'<th class="r" title="Вгадана різниця м\'ячів команди (після завершення групи)">Різн.<sub>гр</sub></th>'
-        +'<th class="r" title="Вгадане місце команди в групі (після завершення групи)">Місце</th>';
+      bhead='<th class="r" title="Скільки точних рахунків вгадано">Рахунок</th>'
+        +'<th class="r" title="Скільки разів вгадано різницю голів у матчі">Різниця</th>'
+        +'<th class="r" title="Скільки разів вгадано результат матчу (напрямок)">Результат</th>'
+        +'<th class="r" title="Скільки разів вгадано очки команди в групі (після завершення групи)">Очки<sub>гр</sub></th>'
+        +'<th class="r" title="Скільки разів вгадано різницю м\'ячів команди (після завершення групи)">Різн.<sub>гр</sub></th>'
+        +'<th class="r" title="Скільки разів вгадано місце команди в групі (після завершення групи)">Місце</th>';
     }
     const wrapCls=breakdown?'scen-wrap':'lb-wrap';
-    const hintTxt=breakdown?(hint+' · '+members.length+' уч. · zero-sum · розбивка очок по категоріях'):(hint+' · '+members.length+' уч. · zero-sum');
+    const hintTxt=hint+' · '+members.length+' уч. · zero-sum';
+    let infoBlock='';
+    if(breakdown){
+      const allG=allGroupMatches();
+      const totalG=allG.length;
+      const playedG=allG.filter(m=>{const r=S.matches[m.id];return r&&r.h!==''&&r.h!==undefined&&r.a!==''&&r.a!==undefined;}).length;
+      const pctPlayed=totalG?Math.round(playedG/totalG*100):0;
+      infoBlock='<div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:.25rem 0 1rem">'
+        +'<div style="font-family:\'Bebas Neue\';font-size:26px;color:var(--gold);line-height:1">'+playedG+'<span style="color:var(--muted);font-size:18px"> / '+totalG+'</span></div>'
+        +'<div style="flex:1;min-width:160px"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">Зіграно групових матчів</div>'
+        +'<div class="pbar"><div class="pbar-fill" style="width:'+pctPlayed+'%"></div></div></div></div>'
+        +'<div style="font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:1rem;line-height:1.6">'
+        +'У колонках — <b style="color:var(--text)">скільки разів вгадано</b>, а не очки. Очки за кожне: '
+        +'<b style="color:var(--text)">Рахунок ×'+s.exact+'</b> · <b style="color:var(--text)">Різниця ×'+(s.diff+s.result)+'</b> · <b style="color:var(--text)">Результат ×'+s.result+'</b> · '
+        +'<b style="color:var(--text)">Очки<sub>гр</sub> ×'+s.groupPts+'</b> · <b style="color:var(--text)">Різн.<sub>гр</sub> ×'+s.goalDiff+'</b> · <b style="color:var(--text)">Місце ×'+s.place+'</b>. '
+        +'Підсумок — у колонці <b style="color:var(--text)">«Очки»</b>. Категорії таблиці групи (Очки<sub>гр</sub>/Різн.<sub>гр</sub>/Місце) нараховуються лише після завершення всіх матчів групи.</div>';
+    }
     const scrollHint=breakdown?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
     return `<div style="margin-top:2rem">
       <div class="sec-title" style="font-size:18px">${title}</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hintTxt}</p>
+      ${infoBlock}
       ${scrollHint}
       <div class="${wrapCls}"><table class="lb-table">
         <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>

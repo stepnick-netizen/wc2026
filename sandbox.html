@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FIFA World Cup 2026 — Прогнози</title>
+<title>🧪 ПІСОЧНИЦЯ — wc2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -223,7 +223,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
 }
 </style>
 </head>
-<body>
+<body><div id="sandbox-banner" style="position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font-weight:800;letter-spacing:.08em;text-align:center;padding:6px 10px;font-size:13px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.4)">🧪 ПІСОЧНИЦЯ — зміни НЕ зберігаються в Google Sheets і не впливають на реальну гру. Дані — локальний знімок. Онови сторінку, щоб підтягнути свіжий стан.</div>
 
 <div class="top-header">
   <div style="display:flex;align-items:center;gap:10px;">
@@ -1057,7 +1057,7 @@ const PLAYOFF_ROUNDS=[
   {id:'final',label:'Фінал',n:1},
 ];
 const CURRENCIES=['UAH','EUR','USD','GBP','AED','ARS','AUD','BRL','CAD','CHF','CNY','CZK','DKK','EGP','HUF','IDR','ILS','INR','JPY','KRW','MAD','MXN','MYR','NGN','NOK','NZD','PLN','QAR','SAR','SEK','SGD','THB','TRY','TWD','ZAR'];
-const KEY='wc2026v3';
+const KEY='wc2026-SANDBOX'; // ПІСОЧНИЦЯ: окремий ключ, не чіпає бойовий кеш wc2026v3
 const SHEETS_API='https://script.google.com/macros/s/AKfycbxTml_DzzgHTm3DP8elC-G4C1QjckauXH5ITdS0u-tMidli7HuBls8UUYlQ9pnx6MM9/exec';
 
 // ── Sheets API helpers ────────────────────────────────────────────
@@ -1067,8 +1067,9 @@ async function sheetsGet(params){
   return r.json();
 }
 async function sheetsPost(body){
-  const r=await fetch(SHEETS_API,{method:'POST',body:JSON.stringify(body)});
-  return r.json();
+  // ПІСОЧНИЦЯ: записи в Google Sheets ВИМКНЕНО. Нічого не йде в бойову таблицю.
+  console.log('[SANDBOX] sheetsPost заблоковано:', body&&body.action);
+  return { ok:true, sandbox:true };
 }
 
 // ── Завантаження стану з Sheets (викликається при старті) ─────────

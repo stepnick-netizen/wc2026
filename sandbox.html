@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🧪 ПІСОЧНИЦЯ — wc2026</title>
+<title>FIFA World Cup 2026 — Прогнози</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -223,7 +223,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
 }
 </style>
 </head>
-<body><div id="sandbox-banner" style="position:sticky;top:0;z-index:9999;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font-weight:800;letter-spacing:.08em;text-align:center;padding:6px 10px;font-size:13px;font-family:system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.4)">🧪 ПІСОЧНИЦЯ — зміни НЕ зберігаються в Google Sheets і не впливають на реальну гру. Дані — локальний знімок. Онови сторінку, щоб підтягнути свіжий стан.</div>
+<body>
 
 <div class="top-header">
   <div style="display:flex;align-items:center;gap:10px;">
@@ -924,6 +924,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
   <div id="lb-bonus-section"></div>
   <div id="lb-combined-section"></div>
   <div id="lb-ideal-section"></div>
+  <div id="lb-scenario-section"></div>
 </div>
 
 <!-- ══ RULES ══ -->
@@ -1057,7 +1058,7 @@ const PLAYOFF_ROUNDS=[
   {id:'final',label:'Фінал',n:1},
 ];
 const CURRENCIES=['UAH','EUR','USD','GBP','AED','ARS','AUD','BRL','CAD','CHF','CNY','CZK','DKK','EGP','HUF','IDR','ILS','INR','JPY','KRW','MAD','MXN','MYR','NGN','NOK','NZD','PLN','QAR','SAR','SEK','SGD','THB','TRY','TWD','ZAR'];
-const KEY='wc2026-SANDBOX'; // ПІСОЧНИЦЯ: окремий ключ, не чіпає бойовий кеш wc2026v3
+const KEY='wc2026v3';
 const SHEETS_API='https://script.google.com/macros/s/AKfycbxTml_DzzgHTm3DP8elC-G4C1QjckauXH5ITdS0u-tMidli7HuBls8UUYlQ9pnx6MM9/exec';
 
 // ── Sheets API helpers ────────────────────────────────────────────
@@ -1067,9 +1068,8 @@ async function sheetsGet(params){
   return r.json();
 }
 async function sheetsPost(body){
-  // ПІСОЧНИЦЯ: записи в Google Sheets ВИМКНЕНО. Нічого не йде в бойову таблицю.
-  console.log('[SANDBOX] sheetsPost заблоковано:', body&&body.action);
-  return { ok:true, sandbox:true };
+  const r=await fetch(SHEETS_API,{method:'POST',body:JSON.stringify(body)});
+  return r.json();
 }
 
 // ── Завантаження стану з Sheets (викликається при старті) ─────────
@@ -1506,6 +1506,169 @@ function calcBonusBalance(name,bonusParticipants){
   if(others.length===0)return 0;
   const diff=others.reduce((sum,n2)=>sum+(myPts-calcPts(n2).bonusPts),0);
   return Math.round(diff*rate);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// СИМУЛЯТОР СЦЕНАРІЮ: «що буде в усіх, якщо для гравця X усе складеться
+// максимально вдало». Підміняємо РЕАЛЬНІ незіграні дані прогнозом X
+// (його рахунки → реальні, його сітка → реальна, його номінації →
+// переможці), рахуємо наявним calcPts для ВСІХ, потім відновлюємо.
+// Перевикористання scoring-логіки → жодного дублювання правил.
+// ══════════════════════════════════════════════════════════════════
+function _isPlayedMatch(mid){
+  const r=S.matches[mid];
+  return r&&r.h!==''&&r.h!==undefined&&r.a!==''&&r.a!==undefined;
+}
+function simulateScenario(name){
+  const predX=S.predictions[name]||{};
+  const pmX=predX.matches||{};
+  // ── Глибокі бекапи реальних полів ──
+  const bk={
+    matches:JSON.parse(JSON.stringify(S.matches||{})),
+    playoffSlots:JSON.parse(JSON.stringify(S.playoffSlots||{})),
+    playoffTeams:JSON.parse(JSON.stringify(S.playoffTeams||{})),
+    nominations:JSON.parse(JSON.stringify(S.nominations||[]))
+  };
+  const result={};
+  try{
+    if(!S.playoffSlots)S.playoffSlots={};
+    if(!S.playoffTeams)S.playoffTeams={};
+
+    // 1) ГРУПОВІ незіграні матчі → ставимо точний рахунок X
+    allGroupMatches().forEach(m=>{
+      if(_isPlayedMatch(m.id))return;
+      const p=pmX[m.id];
+      if(p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined){
+        S.matches[m.id]={h:+p.h,a:+p.a};
+      }
+    });
+
+    // 2) ПЛЕЙОФ: round за round заповнюємо реальні слоти сіткою X і
+    //    результати — рахунками X. getPredSlotsForRound читає S.matches,
+    //    тож після заповнення груп сітка X деривується коректно.
+    PLAYOFF_ROUNDS.forEach(round=>{
+      let slots=[];
+      try{slots=getPredSlotsForRound(round.id,predX);}catch(e){slots=[];}
+      const advanced=[];
+      for(let i=0;i<round.n;i++){
+        const mid=poId(round.id,i);
+        const slot=slots[i];
+        const realHome=slot?slot.home:'', realAway=slot?slot.away:'';
+        // Реальні слоти (пара команд) — як їх бачить X
+        if(realHome||realAway){
+          S.playoffSlots[mid]={home:realHome,away:realAway};
+        }
+        // Результат матчу: якщо вже зіграний — не чіпаємо; інакше беремо рахунок X
+        if(!_isPlayedMatch(mid)){
+          const p=pmX[mid];
+          if(p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined){
+            const sc={h:+p.h,a:+p.a};
+            // переможець (для нічиєї) — за winner з прогнозу, якщо є
+            if(+p.h===+p.a&&p.winner)sc.winner=p.winner;
+            S.matches[mid]=sc;
+          }
+        }
+        // Хто пройшов далі за сценарієм X (для playoffTeams наступних раундів)
+        const res=S.matches[mid];
+        if(res&&res.h!==''&&res.h!==undefined&&(realHome||realAway)){
+          let adv='';
+          if(+res.h>+res.a)adv=realHome;
+          else if(+res.a>+res.h)adv=realAway;
+          else adv=res.winner||realHome;
+          if(adv&&round.id!=='third')advanced.push(adv);
+        }
+      }
+      // playoffTeams[round] = команди, що ГРАЛИ в цьому раунді (для нарахування
+      // балів за вихід). Беремо обидві команди реальних слотів цього раунду.
+      if(round.id!=='third'){
+        const teamsThisRound=[];
+        for(let i=0;i<round.n;i++){
+          const s=(S.playoffSlots||{})[poId(round.id,i)];
+          if(s){if(s.home)teamsThisRound.push(s.home);if(s.away)teamsThisRound.push(s.away);}
+        }
+        if(teamsThisRound.length)S.playoffTeams[round.id]=teamsThisRound;
+      }
+    });
+
+    // 3) НОМІНАЦІЇ незакриті → переможець = вибір X
+    if(Array.isArray(S.nominations)){
+      S.nominations.forEach(n=>{
+        if(n.winner)return; // вже визначено реально
+        const pick=(predX.nominations||{})[n.id]||'';
+        if(pick)n.winner=pick;
+      });
+    }
+
+    // 4) Рахуємо ВСІХ на підмінному стані
+    const rate=(S.currency||{rate:1}).rate||1;
+    S.participants.forEach(n=>{
+      const pts=calcPts(n).total;
+      const bd=calcPoolBalanceBreakdown(n);
+      result[n]={pts, bal:bd.total};
+    });
+  } finally {
+    // ── ВІДНОВЛЕННЯ реальних даних (обовʼязково) ──
+    S.matches=bk.matches;
+    S.playoffSlots=bk.playoffSlots;
+    S.playoffTeams=bk.playoffTeams;
+    S.nominations=bk.nominations;
+  }
+  return result;
+}
+
+function renderScenario(name){
+  const host=document.getElementById('lb-scenario-section');
+  if(!host)return;
+  if(!S.predsVisible){host.innerHTML='';return;}
+  const curr=S.currency||{code:'UAH',rate:1};
+  const code=curr.code||'UAH';
+  const names=S.participants.slice();
+
+  // Дропдаун вибору гравця
+  const opts=names.map(n=>'<option value="'+escapeHtml(n)+'"'+(n===name?' selected':'')+'>'+escapeHtml(n)+'</option>').join('');
+  let out='<div style="margin-top:2rem">'
+    +'<div class="sec-title" style="font-size:18px">🔮 Сценарій: «якщо все складеться для гравця»</div>'
+    +'<p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Обраний гравець виходить за СВОЄЮ сіткою і вгадує всі ще не зіграні матчі точно. Решта рахуються від цього ж сценарію.</p>'
+    +'<div style="margin-bottom:1rem"><select id="scenario-pick" onchange="renderScenario(this.value)" '
+    +'style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:14px;font-weight:600">'
+    +opts+'</select></div>';
+
+  if(!name){host.innerHTML=out+'</div>';return;}
+
+  const sim=simulateScenario(name);
+  // Поточні (фактичні) бали/баланс для колонки «зараз → сценарій»
+  const cur={};
+  S.participants.forEach(n=>{cur[n]={pts:calcPts(n).total, bal:calcPoolBalanceBreakdown(n).total};});
+
+  const rows=names.map(n=>({n, pts:sim[n].pts, bal:sim[n].bal, dPts:sim[n].pts-cur[n].pts, dBal:sim[n].bal-cur[n].bal}))
+                  .sort((a,b)=>b.pts-a.pts);
+  const maxPts=rows[0]?.pts||1;
+
+  out+='<div class="lb-wrap"><table class="lb-table"><thead><tr>'
+    +'<th>#</th><th>Учасник</th><th class="r">Очки</th><th class="r">Δ очок</th>'
+    +'<th class="r">Баланс</th><th class="r">Δ балансу</th><th></th></tr></thead><tbody>';
+  rows.forEach((row,i)=>{
+    const r=i+1, rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
+    const isX=row.n===name;
+    const balCls=row.bal>=0?'uah-pos':'uah-neg';
+    const balStr=(row.bal>=0?'+':'')+row.bal+' '+code;
+    const dP=row.dPts>0?'+'+row.dPts:''+row.dPts;
+    const dPcol=row.dPts>0?'var(--green2)':row.dPts<0?'#ff6b6b':'var(--muted)';
+    const dB=row.dBal>0?'+'+row.dBal:''+row.dBal;
+    const dBcol=row.dBal>0?'var(--green2)':row.dBal<0?'#ff6b6b':'var(--muted)';
+    const pct=Math.round(row.pts/maxPts*100);
+    const nameCell=escapeHtml(row.n)+(isX?' <span style="color:var(--gold);font-size:11px;font-weight:700">★ сценарій</span>':'');
+    out+='<tr'+(isX?' style="background:rgba(212,175,55,.08)"':'')+'>'
+      +'<td class="rank-cell '+rc+'">'+r+'</td>'
+      +'<td class="name-cell">'+nameCell+'</td>'
+      +'<td class="pts-cell">'+row.pts+'</td>'
+      +'<td class="r" style="color:'+dPcol+';font-size:12px">'+(row.dPts!==0?dP:'—')+'</td>'
+      +'<td class="'+balCls+'">'+balStr+'</td>'
+      +'<td class="r" style="color:'+dBcol+';font-size:12px">'+(row.dBal!==0?dB+' '+code:'—')+'</td>'
+      +'<td><div class="pbar"><div class="pbar-fill" style="width:'+pct+'%"></div></div></td></tr>';
+  });
+  out+='</tbody></table></div></div>';
+  host.innerHTML=out;
 }
 
 // Calculate maximum possible points (ideal scenario)
@@ -5448,7 +5611,7 @@ function renderLeaderboard(){
     const bal=calcBalance(p.n, data, curr.rate);
     const balEl=bal>=0?`<td class="uah-pos">+${bal} ${curr.code}</td>`:`<td class="uah-neg">${bal} ${curr.code}</td>`;
     const pct=Math.round(p.total/max*100);
-    return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${p.n}</td>
+    return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell" style="cursor:pointer" title="Сценарій: якщо все складеться для цього гравця" onclick="renderScenario('${p.n.replace(/'/g,"\\'")}');document.getElementById('lb-scenario-section')?.scrollIntoView({behavior:'smooth'})">${p.n}</td>
       <td class="sub-cell">${p.matchPts}</td><td class="sub-cell">${p.groupPts}</td>
       <td class="sub-cell">${p.r32}</td><td class="sub-cell">${p.r16}</td>
       <td class="sub-cell">${p.r8}</td><td class="sub-cell">${p.r4}</td>
@@ -5461,6 +5624,11 @@ function renderLeaderboard(){
 
   // ── Секція «Каси» (4 окремі zero-sum пули) ──
   renderPoolTables();
+
+  // ── Секція «Сценарій» (за замовчуванням — поточний лідер) ──
+  const scenSel=document.getElementById('scenario-pick');
+  const scenName=(scenSel&&scenSel.value)||(data[0]&&data[0].n)||'';
+  if(scenName)renderScenario(scenName); else { const sh=document.getElementById('lb-scenario-section'); if(sh)sh.innerHTML=''; }
 
   // Bonus leaderboard
   const bonusSection=document.getElementById('lb-bonus-section');

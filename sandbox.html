@@ -1067,7 +1067,6 @@ async function sheetsGet(params){
   return r.json();
 }
 async function sheetsPost(body){
-  // ПІСОЧНИЦЯ: записи в Google Sheets ВИМКНЕНО. Нічого не йде в бойову таблицю.
   console.log('[SANDBOX] sheetsPost заблоковано:', body&&body.action);
   return { ok:true, sandbox:true };
 }
@@ -1649,17 +1648,22 @@ function renderScenario(name){
   if(simN)nM.forEach(n=>shown.add(n));
   const rowsAll=[...shown];
 
-  // Сортуємо за сумою балів показаних кас (де учасник бере участь)
-  function sumPts(n){
-    let s=0; if(simG&&simG.has(n))s+=simG.get(n).pts; if(simP&&simP.has(n))s+=simP.get(n).pts; if(simN&&simN.has(n))s+=simN.get(n).pts; return s;
+  // Підсумок балансу гравця = сума балансів ЛИШЕ тих кас, де він бере участь
+  function totalBal(n){
+    let s=0;
+    if(simG&&simG.has(n))s+=simG.get(n).bal;
+    if(simP&&simP.has(n))s+=simP.get(n).bal;
+    if(simN&&simN.has(n))s+=simN.get(n).bal;
+    return s;
   }
-  rowsAll.sort((a,b)=>sumPts(b)-sumPts(a));
+  rowsAll.sort((a,b)=>totalBal(b)-totalBal(a));
 
   // Заголовки колонок — лише активні каси
   let head='<th>#</th><th>Учасник</th>';
   if(simG)head+='<th class="r">🥅 Групи</th><th class="r">Баланс</th>';
   if(simP)head+='<th class="r">🏟️ Плей-оф</th><th class="r">Баланс</th>';
   if(simN)head+='<th class="r">🏅 Номін.</th><th class="r">Баланс</th>';
+  head+='<th class="r">Σ Підсумок</th>';
 
   function cellPair(sim,n){
     if(!sim||!sim.has(n))return '<td class="r" style="color:var(--muted)">—</td><td class="r" style="color:var(--muted)">—</td>';
@@ -1679,8 +1683,31 @@ function renderScenario(name){
     if(simG)out+=cellPair(simG,n);
     if(simP)out+=cellPair(simP,n);
     if(simN)out+=cellPair(simN,n);
+    const tot=totalBal(n);
+    const totCls=tot>=0?'uah-pos':'uah-neg';
+    out+='<td class="'+totCls+'" style="font-weight:800">'+(tot>=0?'+':'')+tot+' '+code+'</td>';
     out+='</tr>';
   });
+  // ── Рядок «Разом»: сума балансів кожної каси та підсумку (контроль zero-sum) ──
+  function sumPoolBal(sim){
+    if(!sim)return null;
+    let s=0; sim.forEach(v=>{s+=v.bal;}); return s;
+  }
+  function balTd(v){
+    if(v===null)return '';
+    const cls=v===0?'':(v>0?'uah-pos':'uah-neg');
+    return '<td class="'+cls+'" style="font-weight:800">'+(v>0?'+':'')+v+' '+code+'</td>';
+  }
+  let totalAll=0;
+  rowsAll.forEach(n=>{totalAll+=totalBal(n);});
+  let foot='<tr style="border-top:2px solid var(--border)">'
+    +'<td></td><td class="name-cell" style="font-weight:800;color:var(--muted)">Разом</td>';
+  if(simG)foot+='<td></td>'+balTd(sumPoolBal(simG));
+  if(simP)foot+='<td></td>'+balTd(sumPoolBal(simP));
+  if(simN)foot+='<td></td>'+balTd(sumPoolBal(simN));
+  const taCls=totalAll===0?'':(totalAll>0?'uah-pos':'uah-neg');
+  foot+='<td class="'+taCls+'" style="font-weight:800">'+(totalAll>0?'+':'')+totalAll+' '+code+'</td></tr>';
+  out+=foot;
   out+='</tbody></table></div></div>';
   host.innerHTML=out;
 }

@@ -5561,10 +5561,11 @@ function renderPoolTables(){
   const curr=S.currency||{code:'UAH',rate:1};
   const rate=curr.rate||1, code=curr.code||'UAH';
 
-  function poolTable(title, hint, members, ptsField){
+  function poolTable(title, hint, members, ptsField, breakdown){
     if(!members||members.length===0)return '';
     const balMap=calcPoolBalances(members, ptsField, rate); // один раз на касу
-    const rows=members.map(n=>({n, pts:calcPts(n)[ptsField]||0}))
+    const s=S.scoring;
+    const rows=members.map(n=>{const d=calcPts(n); return {n, pts:d[ptsField]||0, det:d.detail||{}};})
                       .sort((a,b)=>b.pts-a.pts);
     const maxPts=rows[0]?.pts||1;
     const body=rows.map((row,i)=>{
@@ -5572,15 +5573,40 @@ function renderPoolTables(){
       const bal=balMap.get(row.n)||0;
       const balEl=bal>=0?`<td class="uah-pos">+${bal} ${code}</td>`:`<td class="uah-neg">${bal} ${code}</td>`;
       const pct=Math.round((row.pts/maxPts)*100);
+      let bd='';
+      if(breakdown){
+        const d=row.det;
+        const pExact=(d.exactCount||0)*s.exact;
+        const pDiff=(d.diffCount||0)*(s.diff+s.result); // різниця включає результат
+        const pResult=(d.resultCount||0)*s.result;
+        const pGr=(d.groupPtsCount||0)*s.groupPts;
+        const pGd=(d.goalDiffCount||0)*s.goalDiff;
+        const pPl=(d.placeCount||0)*s.place;
+        function bc(v){return v>0?`<td class="sub-cell">${v}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;}
+        bd=bc(pExact)+bc(pDiff)+bc(pResult)+bc(pGr)+bc(pGd)+bc(pPl);
+      }
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
-        <td class="pts-cell">${row.pts}</td>${balEl}
+        ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
         <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td></tr>`;
     }).join('');
+    let bhead='';
+    if(breakdown){
+      bhead='<th class="r" title="Точний рахунок матчу">Рахунок</th>'
+        +'<th class="r" title="Вгадана різниця голів у матчі">Різниця</th>'
+        +'<th class="r" title="Вгаданий результат матчу (напрямок)">Результат</th>'
+        +'<th class="r" title="Вгадані очки команди в групі (після завершення групи)">Очки<sub>гр</sub></th>'
+        +'<th class="r" title="Вгадана різниця м\'ячів команди (після завершення групи)">Різн.<sub>гр</sub></th>'
+        +'<th class="r" title="Вгадане місце команди в групі (після завершення групи)">Місце</th>';
+    }
+    const wrapCls=breakdown?'scen-wrap':'lb-wrap';
+    const hintTxt=breakdown?(hint+' · '+members.length+' уч. · zero-sum · розбивка очок по категоріях'):(hint+' · '+members.length+' уч. · zero-sum');
+    const scrollHint=breakdown?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
     return `<div style="margin-top:2rem">
       <div class="sec-title" style="font-size:18px">${title}</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hint} · ${members.length} уч. · zero-sum</p>
-      <div class="lb-wrap"><table class="lb-table">
-        <thead><tr><th>#</th><th>Учасник</th><th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hintTxt}</p>
+      ${scrollHint}
+      <div class="${wrapCls}"><table class="lb-table">
+        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>
         <tbody>${body}</tbody>
       </table></div></div>`;
   }
@@ -5590,7 +5616,7 @@ function renderPoolTables(){
   const nM=poolMembers(inNomPool);
 
   let out='';
-  out+=poolTable('🥅 Каса: Груповий етап','Хто заповнив усі матчі груп', gM, 'poolGroup');
+  out+=poolTable('🥅 Каса: Груповий етап','Хто заповнив усі матчі груп', gM, 'poolGroup', true);
   out+=poolTable('🏟️ Каса: Плей-оф','Хто заповнив фінал і матч за 3-тє', pM, 'poolPlayoff');
   out+=poolTable('🏅 Каса: Номінації','Хто заповнив усі номінації', nM, 'poolNoms');
 

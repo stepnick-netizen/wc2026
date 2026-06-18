@@ -6024,8 +6024,9 @@ function syncLiveTab(){
 // цієї підмножини: bal(X) = (N·ptsX − Σ ptsK)·rate за конкретного рахунку R.
 // best  = я вгадую точно (R = мій прогноз), opponents рахуються проти мого R.
 // worst = серед усіх рахунків, які поставили опоненти, той що дає мені мін. баланс.
-function liveMatchEconomics(preds, rate){
+function liveMatchEconomics(preds, rate, currentR){
   // preds: [{n, h, a}] — валідні прогнози на цей матч
+  // currentR: {h,a}|null — поточний рахунок адміна (для колонки «Зараз»)
   const N=preds.length, r=+rate||1;
   if(N<2)return {}; // каса з одного гравця сенсу не має
   const out={};
@@ -6043,6 +6044,8 @@ function liveMatchEconomics(preds, rate){
   // унікальні рахунки опонентів (кандидати для worst)
   const uniq=[]; const seen=new Set();
   preds.forEach(p=>{const key=p.h+':'+p.a; if(!seen.has(key)){seen.add(key);uniq.push({h:p.h,a:p.a});}});
+  const cur=(currentR&&currentR.h!==''&&currentR.h!==undefined&&currentR.a!==''&&currentR.a!==undefined)
+    ?{h:+currentR.h,a:+currentR.a}:null;
   for(let i=0;i<N;i++){
     // best: R = мій власний прогноз
     const best=balFor(i,{h:preds[i].h,a:preds[i].a});
@@ -6052,7 +6055,9 @@ function liveMatchEconomics(preds, rate){
       const b=balFor(i,R).bal;
       if(b<worstBal){worstBal=b;worstR=R;}
     });
-    out[preds[i].n]={best:Math.round(best.bal), worst:Math.round(worstBal), worstScore:worstR};
+    // now: за поточним рахунком адміна
+    const now=cur?Math.round(balFor(i,cur).bal):null;
+    out[preds[i].n]={best:Math.round(best.bal), worst:Math.round(worstBal), worstScore:worstR, now};
   }
   return out;
 }
@@ -6169,14 +6174,17 @@ function renderLive(){
         html+='<div style="padding:1rem;color:var(--muted);font-size:13px">Ніхто не зробив прогноз на цей матч.</div>';
       } else {
         const curr=S.currency||{code:'UAH',rate:1};
-        const econ=liveMatchEconomics(single, curr.rate||1);
+        const nowR=hasRes?{h:res.h,a:res.a}:null;
+        const econ=liveMatchEconomics(single, curr.rate||1, nowR);
         const code=curr.code||'UAH';
         const hasEcon=Object.keys(econ).length>0;
         const fmt=v=>(v>0?'+':'')+v+' '+code;
+        const gridCols=hasRes?'1fr auto 100px 110px 130px':'1fr auto 110px 130px';
         html+='<div style="padding:.5rem 0">';
         if(hasEcon){
-          html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:1fr auto 110px 130px;gap:8px;align-items:center;padding:.35rem 1rem;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">'
+          html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:'+gridCols+';gap:8px;align-items:center;padding:.35rem 1rem;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">'
             +'<span>Учасник</span><span style="text-align:right">Прогноз</span>'
+            +(hasRes?'<span style="text-align:right" title="Баланс за поточним рахунком">● Зараз</span>':'')
             +'<span style="text-align:right" title="Якщо вгадаю точний рахунок">▲ Найкраще</span>'
             +'<span style="text-align:right" title="Найгірший для мене рахунок з тих, що поставили опоненти">▼ Найгірше</span></div>';
         }
@@ -6186,9 +6194,14 @@ function renderLive(){
           html+='<div class="le-row" onclick="this.querySelector(\'.le-detail\')&&this.querySelector(\'.le-detail\').classList.toggle(\'open\')">';
           // основний рядок
           if(hasEcon){
-            html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:1fr auto 110px 130px;gap:8px;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
+            html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:'+gridCols+';gap:8px;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
             html+='<span style="font-size:14px;font-weight:600;color:'+m.col+'">'+escapeHtml(r.n)+m.mark+'</span>';
             html+='<span style="font-family:\'Bebas Neue\';font-size:20px;color:'+m.col+';text-align:right">'+r.h+' : '+r.a+'</span>';
+            if(hasRes){
+              const nv=e&&e.now!==null?e.now:null;
+              const ncol=nv===null?'var(--muted)':(nv>0?'var(--green2)':nv<0?'#ff6b6b':'var(--muted)');
+              html+='<span class="le-econ" style="text-align:right;color:'+ncol+'">'+(nv===null?'·':fmt(nv))+'</span>';
+            }
             html+='<span class="le-econ le-best" style="text-align:right">'+(e?fmt(e.best):'·')+'</span>';
             html+='<span class="le-econ le-worst" style="text-align:right">'+(e?fmt(e.worst)+' <span class="le-tag">('+e.worstScore.h+':'+e.worstScore.a+')</span>':'·')+'</span>';
             html+='</div>';
@@ -6200,6 +6213,10 @@ function renderLive(){
           html+='</div>';
           if(hasEcon&&e){
             html+='<div class="le-detail" style="padding:.5rem 1rem .7rem;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;line-height:1.7">';
+            if(hasRes&&e.now!==null){
+              const ncol=e.now>0?'var(--green2)':e.now<0?'#ff6b6b':'var(--muted)';
+              html+='<div><span style="font-weight:700;color:'+ncol+'">● Зараз ('+res.h+':'+res.a+'):</span> '+fmt(e.now)+'</div>';
+            }
             html+='<div><span class="le-best" style="font-weight:700">▲ Найкраще:</span> '+fmt(e.best)+' <span class="le-tag">(якщо вгадаєш точний рахунок '+r.h+':'+r.a+')</span></div>';
             html+='<div><span class="le-worst" style="font-weight:700">▼ Найгірше:</span> '+fmt(e.worst)+' <span class="le-tag">(якщо буде '+e.worstScore.h+':'+e.worstScore.a+')</span></div>';
             html+='</div>';

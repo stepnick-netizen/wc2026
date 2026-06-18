@@ -80,6 +80,24 @@ nav{background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;
 .scen-wrap .lb-table tr:hover td:nth-child(1),.scen-wrap .lb-table tr:hover td:nth-child(2){background:var(--card);}
 .scen-hint{font-size:11px;color:var(--muted);margin-bottom:.4rem;display:none;}
 @media(max-width:640px){.scen-hint{display:block;}}
+/* Live economics: ▲ best / ▼ worst UAH per player */
+.le-row{cursor:default;}
+.le-econ{font-family:'Bebas Neue';font-size:18px;white-space:nowrap;}
+.le-best{color:var(--green2);}
+.le-worst{color:#ff6b6b;}
+.le-tag{font-size:11px;color:var(--muted);font-family:inherit;}
+.le-detail{display:none;}
+.le-mob{display:none;}
+@media(max-width:640px){
+  .le-row{cursor:pointer;}
+  .le-econ-inline{display:none!important;}
+  .le-mob{display:flex!important;}
+  .le-detail.open{display:block;}
+}
+@media(min-width:641px){
+  .le-detail{display:none!important;}
+  .le-mob{display:none!important;}
+}
 .rank-cell{font-family:'Bebas Neue';font-size:20px;width:36px;}
 .gold-rank{color:var(--gold);}
 .silver-rank{color:#aab8c2;}
@@ -926,10 +944,11 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       <th class="r" data-i18n="col_noms">Номін.</th>
       <th class="r" data-i18n="col_total">Очки</th>
       <th class="r" data-i18n="col_balance">Баланс</th>
-      <th></th>
+      <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
     </tr></thead>
     <tbody id="lb-body"></tbody>
   </table></div>
+  <div id="lb-cash-total"></div>
   <div id="lb-pools-section"></div>
   <div id="lb-bonus-section"></div>
   <div id="lb-combined-section"></div>
@@ -1427,6 +1446,40 @@ function calcDetailedPts(name){
 }
 
 function calcPts(name){return calcDetailedPts(name);}
+
+// % влучності матчевих прогнозів: скільки зіграних матчів з прогнозом дали
+// бодай якесь очко (точний рахунок / різниця / результат) — з усіх зіграних,
+// де гравець залишив прогноз. Групи + плей-оф (матчеві), без балів за таблиці.
+// Повертає {hit, total, pct} або null якщо немає жодного зіграного матчу з прогнозом.
+function matchAccuracy(name){
+  const s=S.scoring, pred=S.predictions[name]||{}, pm=pred.matches||{};
+  let hit=0, total=0;
+  function consider(mid, predScore){
+    const res=S.matches[mid];
+    if(!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined)return;
+    if(!predScore||predScore.h===''||predScore.h===undefined||predScore.a===''||predScore.a===undefined)return;
+    total++;
+    const sc=scoreMatch(+res.h,+res.a,+predScore.h,+predScore.a,s);
+    if(sc.exact||sc.result||sc.diff)hit++;
+  }
+  // Групові матчі — прямий збіг id
+  allGroupMatches().forEach(m=>consider(m.id, pm[m.id]));
+  // Плей-оф матчі — прогноз за сіткою гравця, лише якщо пара співпала
+  PLAYOFF_ROUNDS.forEach(round=>{
+    let slots=[];
+    try{slots=getPredSlotsForRound(round.id,pred);}catch(e){slots=[];}
+    for(let i=0;i<round.n;i++){
+      const mid=poId(round.id,i);
+      const real=(S.playoffSlots||{})[mid];
+      const slot=slots[i];
+      if(!real||!slot)continue;
+      const pairOk=(slot.home===real.home&&slot.away===real.away)||(slot.home===real.away&&slot.away===real.home);
+      if(pairOk)consider(mid, pm[mid]);
+    }
+  });
+  if(total===0)return null;
+  return {hit, total, pct:Math.round(hit/total*100)};
+}
 
 // ══════════════════════════════════════════════════════════════════
 // 4 ОКРЕМІ КАСИ (pools) — критерії участі + zero-sum баланс
@@ -5572,7 +5625,6 @@ function renderPoolTables(){
       const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
       const bal=balMap.get(row.n)||0;
       const balEl=bal>=0?`<td class="uah-pos">+${bal} ${code}</td>`:`<td class="uah-neg">${bal} ${code}</td>`;
-      const pct=Math.round((row.pts/maxPts)*100);
       let bd='';
       if(breakdown){
         const d=row.det;
@@ -5581,9 +5633,12 @@ function renderPoolTables(){
         bd=bc(d.exactCount||0)+bc(d.diffCount||0)+bc(d.resultCount||0)
           +bc(d.groupPtsCount||0)+bc(d.goalDiffCount||0)+bc(d.placeCount||0);
       }
+      let accCell='<td class="r" style="color:var(--muted)">·</td>';
+      const acc=matchAccuracy(row.n);
+      if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
         ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
-        <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td></tr>`;
+        ${accCell}</tr>`;
     }).join('');
     let bhead='';
     if(breakdown){
@@ -5605,7 +5660,7 @@ function renderPoolTables(){
       infoBlock='<div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:.25rem 0 1rem">'
         +'<div style="font-family:\'Bebas Neue\';font-size:26px;color:var(--gold);line-height:1">'+playedG+'<span style="color:var(--muted);font-size:18px"> / '+totalG+'</span></div>'
         +'<div style="flex:1;min-width:160px"><div style="font-size:12px;color:var(--muted);margin-bottom:4px">Зіграно групових матчів</div>'
-        +'<div class="pbar"><div class="pbar-fill" style="width:'+pctPlayed+'%"></div></div></div></div>'
+        +'<div style="font-family:\'Bebas Neue\';font-size:22px;color:var(--text);line-height:1">'+pctPlayed+'%</div></div></div>'
         +'<div style="font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:1rem;line-height:1.6">'
         +'У колонках — <b style="color:var(--text)">скільки разів вгадано</b>, а не очки. Очки за кожне: '
         +'<b style="color:var(--text)">Рахунок ×'+s.exact+'</b> · <b style="color:var(--text)">Різниця ×'+(s.diff+s.result)+'</b> · <b style="color:var(--text)">Результат ×'+s.result+'</b> · '
@@ -5619,7 +5674,7 @@ function renderPoolTables(){
       ${infoBlock}
       ${scrollHint}
       <div class="${wrapCls}"><table class="lb-table">
-        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th></tr></thead>
         <tbody>${body}</tbody>
       </table></div></div>`;
   }
@@ -5644,7 +5699,6 @@ function renderLeaderboard(){
     const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
     const bal=calcBalance(p.n, data, curr.rate);
     const balEl=bal>=0?`<td class="uah-pos">+${bal} ${curr.code}</td>`:`<td class="uah-neg">${bal} ${curr.code}</td>`;
-    const pct=Math.round(p.total/max*100);
     return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell" style="cursor:pointer" title="Сценарій: якщо все складеться для цього гравця" onclick="renderScenario('${p.n.replace(/'/g,"\\'")}');document.getElementById('lb-scenario-section')?.scrollIntoView({behavior:'smooth'})">${p.n}</td>
       <td class="sub-cell">${p.matchPts}</td><td class="sub-cell">${p.groupPts}</td>
       <td class="sub-cell">${p.r32}</td><td class="sub-cell">${p.r16}</td>
@@ -5652,9 +5706,20 @@ function renderLeaderboard(){
       <td class="sub-cell">${p.fin}</td><td class="sub-cell">${p.champ}</td>
       <td class="sub-cell">${p.nomPts}</td>
       <td class="pts-cell">${p.total}</td>${balEl}
-      <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
+      ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
     </tr>`;
   }).join('');
+
+  // ── Підсумок загальної каси: сума всіх додатних балансів (= |від'ємних|) ──
+  const cashEl=document.getElementById('lb-cash-total');
+  if(cashEl){
+    const balances=data.map(p=>calcBalance(p.n, data, curr.rate));
+    const pot=balances.reduce((s,b)=>s+(b>0?b:0),0);
+    cashEl.innerHTML='<div style="display:flex;align-items:center;justify-content:flex-end;gap:.6rem;'
+      +'padding:.7rem 1rem;margin-top:.25rem;border-top:1px solid var(--border)">'
+      +'<span style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">💰 Загальна каса</span>'
+      +'<span style="font-family:\'Bebas Neue\';font-size:24px;color:var(--gold)">'+pot+' '+curr.code+'</span></div>';
+  }
 
   // ── Секція «Каси» (4 окремі zero-sum пули) ──
   renderPoolTables();
@@ -5688,14 +5753,12 @@ function renderLeaderboard(){
           <th class="r">Номін.</th>
           <th class="r">Очки</th>
           <th class="r">Баланс</th>
-          <th></th>
         </tr></thead>
         <tbody>${bData.map((p,i)=>{
           const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
           const bd=p.bonusDetail||{};
           const bal=calcBonusBalance(p.n,bonusParticipants);
           const balEl=bal>=0?`<td class="uah-pos">+${bal} ${bCode}</td>`:`<td class="uah-neg">${bal} ${bCode}</td>`;
-          const pct=Math.round(p.bonusPts/bMax*100);
           return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${p.n}</td>
             <td class="sub-cell">${(bd.bExact||0)+(bd.bResult||0)>0?(bd.bExact||0)*3+(bd.bResult||0):0}</td>
             <td class="sub-cell">${bd.bR16||0}</td>
@@ -5703,7 +5766,6 @@ function renderLeaderboard(){
             <td class="sub-cell">${bd.bFin||0}</td><td class="sub-cell">${bd.bChamp||0}</td>
             <td class="sub-cell">${bd.bNom||0}</td>
             <td class="pts-cell">${p.bonusPts}</td>${balEl}
-            <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>
@@ -5726,12 +5788,11 @@ function renderLeaderboard(){
           <th class="r">Бонус</th>
           <th class="r" style="color:var(--gold)">Всього</th>
           <th class="r">Баланс</th>
-          <th></th>
+          <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
         </tr></thead>
         <tbody>${allPart.map((p,i)=>{
           const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
           const combined=p.total+p.bonusPts;
-          const pct=Math.round(combined/combinedMax*100);
           // Баланс: основний (від загальних очок) + бонусний (окрема каса)
           const mainBal=calcBalance(p.n, allPart, mainRate);
           const bonusParts2=getBonusParticipants();
@@ -5745,7 +5806,7 @@ function renderLeaderboard(){
             <td class="sub-cell" style="color:var(--blue3)">${p.bonusPts||0}</td>
             <td class="pts-cell" style="color:var(--gold)">${combined}</td>
             ${balEl}
-            <td><div class="pbar"><div class="pbar-fill" style="width:${pct}%"></div></div></td>
+            ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
           </tr>`;
         }).join('')}</tbody>
       </table></div>
@@ -5968,6 +6029,44 @@ function syncLiveTab(){
   const on=Array.isArray(S.liveMatches)&&S.liveMatches.length>0;
   tab.style.display=on?'':'none';
 }
+function liveMatchEconomics(preds, rate, currentR){
+  // preds: [{n, h, a}] — валідні прогнози на цей матч
+  // currentR: {h,a}|null — поточний рахунок адміна (для колонки «Зараз»)
+  const N=preds.length, r=+rate||1;
+  if(N<2)return {}; // каса з одного гравця сенсу не має
+  const out={};
+  function balFor(meIdx, R){
+    // R = {h,a}. ptsK = очки гравця K за його прогноз проти R.
+    let mePts=0, sum=0;
+    for(let k=0;k<N;k++){
+      const sc=scoreMatch(R.h,R.a,preds[k].h,preds[k].a,S.scoring);
+      const pk=sc.exact+sc.result+sc.diff;
+      sum+=pk;
+      if(k===meIdx)mePts=pk;
+    }
+    return {bal:(N*mePts-sum)*r, mePts};
+  }
+  // унікальні рахунки опонентів (кандидати для worst)
+  const uniq=[]; const seen=new Set();
+  preds.forEach(p=>{const key=p.h+':'+p.a; if(!seen.has(key)){seen.add(key);uniq.push({h:p.h,a:p.a});}});
+  const cur=(currentR&&currentR.h!==''&&currentR.h!==undefined&&currentR.a!==''&&currentR.a!==undefined)
+    ?{h:+currentR.h,a:+currentR.a}:null;
+  for(let i=0;i<N;i++){
+    // best: R = мій власний прогноз
+    const best=balFor(i,{h:preds[i].h,a:preds[i].a});
+    // worst: перебір рахунків опонентів
+    let worstBal=Infinity, worstR=null;
+    uniq.forEach(R=>{
+      const b=balFor(i,R).bal;
+      if(b<worstBal){worstBal=b;worstR=R;}
+    });
+    // now: за поточним рахунком адміна
+    const now=cur?Math.round(balFor(i,cur).bal):null;
+    out[preds[i].n]={best:Math.round(best.bal), worst:Math.round(worstBal), worstScore:worstR, now};
+  }
+  return out;
+}
+
 function renderLive(){
   const el=document.getElementById('live-content');
   if(!el)return;
@@ -6079,16 +6178,60 @@ function renderLive(){
       if(single.length===0){
         html+='<div style="padding:1rem;color:var(--muted);font-size:13px">Ніхто не зробив прогноз на цей матч.</div>';
       } else {
+        const curr=S.currency||{code:'UAH',rate:1};
+        const nowR=hasRes?{h:res.h,a:res.a}:null;
+        const econ=liveMatchEconomics(single, curr.rate||1, nowR);
+        const code=curr.code||'UAH';
+        const hasEcon=Object.keys(econ).length>0;
+        const fmt=v=>(v>0?'+':'')+v+' '+code;
+        const gridCols=hasRes?'1fr auto 100px 110px 130px':'1fr auto 110px 130px';
         html+='<div style="padding:.5rem 0">';
+        if(hasEcon){
+          html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:'+gridCols+';gap:8px;align-items:center;padding:.35rem 1rem;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">'
+            +'<span>Учасник</span><span style="text-align:right">Прогноз</span>'
+            +(hasRes?'<span style="text-align:right" title="Баланс за поточним рахунком">● Зараз</span>':'')
+            +'<span style="text-align:right" title="Якщо вгадаю точний рахунок">▲ Найкраще</span>'
+            +'<span style="text-align:right" title="Найгірший для мене рахунок з тих, що поставили опоненти">▼ Найгірше</span></div>';
+        }
         single.forEach(r=>{
           const m=markFor({h:r.h,a:r.a});
-          html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
-          html+='<span style="font-size:14px;font-weight:600;color:'+m.col+'">'+escapeHtml(r.n)+m.mark+'</span>';
+          const e=econ[r.n];
+          html+='<div class="le-row" onclick="this.querySelector(\'.le-detail\')&&this.querySelector(\'.le-detail\').classList.toggle(\'open\')">';
+          // основний рядок
+          if(hasEcon){
+            html+='<div class="le-econ-inline" style="display:grid;grid-template-columns:'+gridCols+';gap:8px;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
+            html+='<span style="font-size:14px;font-weight:600;color:'+m.col+'">'+escapeHtml(r.n)+m.mark+'</span>';
+            html+='<span style="font-family:\'Bebas Neue\';font-size:20px;color:'+m.col+';text-align:right">'+r.h+' : '+r.a+'</span>';
+            if(hasRes){
+              const nv=e&&e.now!==null?e.now:null;
+              const ncol=nv===null?'var(--muted)':(nv>0?'var(--green2)':nv<0?'#ff6b6b':'var(--muted)');
+              html+='<span class="le-econ" style="text-align:right;color:'+ncol+'">'+(nv===null?'·':fmt(nv))+'</span>';
+            }
+            html+='<span class="le-econ le-best" style="text-align:right">'+(e?fmt(e.best):'·')+'</span>';
+            html+='<span class="le-econ le-worst" style="text-align:right">'+(e?fmt(e.worst)+' <span class="le-tag">('+e.worstScore.h+':'+e.worstScore.a+')</span>':'·')+'</span>';
+            html+='</div>';
+          }
+          // мобільний компактний рядок + accordion
+          html+='<div class="le-mob" style="display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
+          html+='<span style="font-size:14px;font-weight:600;color:'+m.col+'">'+escapeHtml(r.n)+m.mark+(hasEcon?' <span style="color:var(--muted);font-size:11px">▾</span>':'')+'</span>';
           html+='<span style="font-family:\'Bebas Neue\';font-size:20px;color:'+m.col+'">'+r.h+' : '+r.a+'</span>';
+          html+='</div>';
+          if(hasEcon&&e){
+            html+='<div class="le-detail" style="padding:.5rem 1rem .7rem;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;line-height:1.7">';
+            if(hasRes&&e.now!==null){
+              const ncol=e.now>0?'var(--green2)':e.now<0?'#ff6b6b':'var(--muted)';
+              html+='<div><span style="font-weight:700;color:'+ncol+'">● Зараз ('+res.h+':'+res.a+'):</span> '+fmt(e.now)+'</div>';
+            }
+            html+='<div><span class="le-best" style="font-weight:700">▲ Найкраще:</span> '+fmt(e.best)+' <span class="le-tag">(якщо вгадаєш точний рахунок '+r.h+':'+r.a+')</span></div>';
+            html+='<div><span class="le-worst" style="font-weight:700">▼ Найгірше:</span> '+fmt(e.worst)+' <span class="le-tag">(якщо буде '+e.worstScore.h+':'+e.worstScore.a+')</span></div>';
+            html+='</div>';
+          }
           html+='</div>';
         });
         html+='</div>';
-        html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">'+single.length+' прогноз(ів)'+(hasRes?' · ✓ точний · ≈ різниця · ~ напрямок · ✗ мимо':'')+'</div>';
+        html+='<div style="padding:.5rem 1rem;font-size:11px;color:var(--muted)">'+single.length+' прогноз(ів)'
+          +(hasEcon?' · ▲/▼ — потенційний виграш у '+code+' усередині цієї каси (zero-sum серед '+single.length+' гравців)':'')
+          +(hasRes?' · ✓ точний · ≈ різниця · ~ напрямок · ✗ мимо':'')+'</div>';
       }
     }
     html+='</div>';

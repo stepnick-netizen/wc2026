@@ -948,6 +948,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
     </tr></thead>
     <tbody id="lb-body"></tbody>
   </table></div>
+  <div id="lb-cash-total"></div>
   <div id="lb-pools-section"></div>
   <div id="lb-bonus-section"></div>
   <div id="lb-combined-section"></div>
@@ -5709,6 +5710,17 @@ function renderLeaderboard(){
       ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
     </tr>`;
   }).join('');
+
+  // ── Підсумок загальної каси: сума всіх додатних балансів (= |від'ємних|) ──
+  const cashEl=document.getElementById('lb-cash-total');
+  if(cashEl){
+    const balances=data.map(p=>calcBalance(p.n, data, curr.rate));
+    const pot=balances.reduce((s,b)=>s+(b>0?b:0),0);
+    cashEl.innerHTML='<div style="display:flex;align-items:center;justify-content:flex-end;gap:.6rem;'
+      +'padding:.7rem 1rem;margin-top:.25rem;border-top:1px solid var(--border)">'
+      +'<span style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">💰 Загальна каса</span>'
+      +'<span style="font-family:\'Bebas Neue\';font-size:24px;color:var(--gold)">'+pot+' '+curr.code+'</span></div>';
+  }
 
   // ── Секція «Каси» (4 окремі zero-sum пули) ──
   renderPoolTables();

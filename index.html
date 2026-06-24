@@ -5308,7 +5308,7 @@ function renderAwards(){
       const p=getPred(name,m.id);
       if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
       const sc=scoreMatch(rH,rA,+p.h,+p.a,S.scoring);
-      preds.push({name,pts:sc.exact+sc.result+sc.diff,exact:!!sc.exact});
+      preds.push({name,pts:sc.exact+sc.result+sc.diff,exact:!!sc.exact,ph:+p.h,pa:+p.a});
     });
     const N=preds.length;
     let exactCount=0,zeroCount=0,totalPts=0;
@@ -5321,7 +5321,7 @@ function renderAwards(){
       if(N>=2){
         const bal=(N*x.pts - sumPts)*rate;
         matchPlayerBal.push({matchId:m.id, home:m.home, away:m.away, res,
-          name:x.name, bal:Math.round(bal), pts:x.pts});
+          name:x.name, bal:Math.round(bal), pts:x.pts, ph:x.ph, pa:x.pa});
       }
     });
     matchStats[m.id]={exactCount,zeroCount,totalPts,N,
@@ -5370,7 +5370,7 @@ function renderAwards(){
   if(goldList.length){
     awards.push({icon:'💰',title:'Золоті матчі',
       desc:`Топ-5 матчів, де учасник заробив найбільше (zero-sum серед тих, хто прогнозував; лише групові)`,
-      list:goldList.map(x=>({label:`${x.name} — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
+      list:goldList.map(x=>({label:`${x.name} (${x.ph}:${x.pa}) — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
       color:'var(--gold)'});
   }
 
@@ -5379,7 +5379,7 @@ function renderAwards(){
   if(failList.length){
     awards.push({icon:'💸',title:'Матч-невдача',
       desc:`Топ-5 матчів, де учасник втратив найбільше (zero-sum серед тих, хто прогнозував; лише групові)`,
-      list:failList.map(x=>({label:`${x.name} — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
+      list:failList.map(x=>({label:`${x.name} (${x.ph}:${x.pa}) — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
       color:'#ff6b6b'});
   }
 

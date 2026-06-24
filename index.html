@@ -5239,6 +5239,7 @@ function renderAwards(){
   const allMatches=allGroupMatches();
   const played=allMatches.filter(m=>S.matches[m.id]?.h!==''&&S.matches[m.id]?.h!==undefined);
   const curr=S.currency||{code:'UAH',rate:1};
+  const rate=+curr.rate||1, code=curr.code||'UAH';
   const allData=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
 
   if(played.length===0){
@@ -5250,191 +5251,166 @@ function renderAwards(){
     return;
   }
 
-  // ── Helper: get prediction for participant for a match
   const getPred=(name,mid)=>(S.predictions[name]?.matches||{})[mid];
   const getRes=(mid)=>S.matches[mid];
+  const playedCount=played.length;
 
-  // ── Compute per-participant per-match stats
+  // ── Helper: знайти всіх учасників з max/min значенням (з tie) ──
+  // sel(name) -> число. dir='max'|'min'. Повертає масив імен.
+  function leaders(sel, dir){
+    let bestVal=null;
+    S.participants.forEach(n=>{
+      const v=sel(n);
+      if(bestVal===null||(dir==='max'?v>bestVal:v<bestVal))bestVal=v;
+    });
+    const names=S.participants.filter(n=>sel(n)===bestVal);
+    return {names, val:bestVal};
+  }
+  const joinNames=arr=>arr.join(', ');
+
+  // ── Per-participant per-match stats ──
   const partStats={};
   S.participants.forEach(name=>{
     const pm=S.predictions[name]?.matches||{};
-    let exact=0,result=0,diff=0,totalGoalsPred=0,draws=0,wins1=0,zero_zero=0,big=0,zeroPts=0,bestRound=0,worstRound=99;
-    let roundPts=[];
+    let exact=0,result1=0,diff2=0,anyHit=0,totalGoalsPred=0,draws=0,zero_zero=0,big=0,zeroPts=0;
     played.forEach(m=>{
       const res=getRes(m.id),p=pm[m.id];
-      if(!res||!p||p.h===''||p.h===undefined)return;
+      if(!res||!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
       const rH=+res.h,rA=+res.a,pH=+p.h,pA=+p.a;
       totalGoalsPred+=pH+pA;
       if(pH===0&&pA===0)zero_zero++;
       if(pH>4||pA>4)big++;
       if(Math.sign(pH-pA)===0)draws++;
-      if(pH>pA)wins1++;
       const sc=scoreMatch(rH,rA,pH,pA,S.scoring);
       const pts=sc.exact+sc.result+sc.diff;
       if(pts===0)zeroPts++;
+      // триступенева класифікація: 3 (exact) / 2 (result+diff) / 1 (тільки напрямок)
       if(sc.exact)exact++;
-      else if(sc.result)result++;
-      else if(sc.diff)diff++;
-      roundPts.push(pts);
+      else if(sc.result&&sc.diff)diff2++;       // вгадав напрямок І різницю голів = 2 очки
+      else if(sc.result)result1++;              // вгадав лише напрямок = 1 очко
+      if(Math.sign(pH-pA)===Math.sign(rH-rA))anyHit++; // вгадав В/Н/П (будь-який ненульовий)
     });
-    const maxRound=roundPts.length?Math.max(...roundPts):0;
-    const minRound=roundPts.length?Math.min(...roundPts):0;
-    const variance=roundPts.length?Math.max(...roundPts)-Math.min(...roundPts):0;
-    partStats[name]={exact,result,diff,totalGoalsPred,draws,wins1,zero_zero,big,zeroPts,variance,maxRound,roundPts};
+    partStats[name]={exact,result1,diff2,anyHit,totalGoalsPred,draws,zero_zero,big,zeroPts};
   });
 
-  // ── Compute per-match stats
+  // ── Per-match stats + per-(match,player) economics ──
+  // matchStats: exactCount, zeroCount (серед тих, хто прогнозував), N
+  // matchPlayerBal: [{match, name, bal}] — zero-sum баланс гравця на матчі
   const matchStats={};
+  const matchPlayerBal=[];
   played.forEach(m=>{
     const res=getRes(m.id);
     if(!res)return;
     const rH=+res.h,rA=+res.a;
-    let exactCount=0,resultCount=0,zeroCount=0,totalPts=0;
+    // підмножина: лише ті, хто дав валідний прогноз на цей матч
+    const preds=[];
     S.participants.forEach(name=>{
       const p=getPred(name,m.id);
-      if(!p||p.h===''||p.h===undefined)return;
+      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
       const sc=scoreMatch(rH,rA,+p.h,+p.a,S.scoring);
-      const pts=sc.exact+sc.result+sc.diff;
-      totalPts+=pts;
-      if(sc.exact)exactCount++;
-      if(sc.result&&!sc.exact)resultCount++;
-      if(pts===0)zeroCount++;
+      preds.push({name,pts:sc.exact+sc.result+sc.diff,exact:!!sc.exact});
     });
-    matchStats[m.id]={exactCount,resultCount,zeroCount,totalPts,
-      label:`${m.home.n} vs ${m.away.n} (${res.h}:${res.a})`,
+    const N=preds.length;
+    let exactCount=0,zeroCount=0,totalPts=0;
+    const sumPts=preds.reduce((s,x)=>s+x.pts,0);
+    preds.forEach(x=>{
+      if(x.exact)exactCount++;
+      if(x.pts===0)zeroCount++;
+      totalPts+=x.pts;
+      // zero-sum баланс: (N·mePts − Σ)·rate, тільки якщо N≥2
+      if(N>=2){
+        const bal=(N*x.pts - sumPts)*rate;
+        matchPlayerBal.push({matchId:m.id, home:m.home, away:m.away, res,
+          name:x.name, bal:Math.round(bal), pts:x.pts});
+      }
+    });
+    matchStats[m.id]={exactCount,zeroCount,totalPts,N,
       home:m.home,away:m.away,res};
   });
 
-  // ── Award definitions
+  const fmtMatch=ms=>`${ms.home.n} ${ms.res.h}:${ms.res.a} ${ms.away.n}`;
+  const fmtBal=v=>(v>0?'+':'')+v+' '+code;
+
+  // ── Award definitions ──
   const awards=[];
 
+  // 👑 Лідер турніру (featured)
+  const ldr=leaders(n=>calcPts(n).total,'max');
+  awards.push({icon:'👑',title:'Лідер турніру',desc:'Найбільше очок на даний момент',
+    winner:joinNames(ldr.names),value:`${ldr.val} очок`,color:'var(--gold)',featured:true});
+
   // 🎯 Снайпер
-  const sniper=S.participants.reduce((best,n)=>partStats[n].exact>partStats[best].exact?n:best,S.participants[0]);
+  const sn=leaders(n=>partStats[n].exact,'max');
   awards.push({icon:'🎯',title:'Снайпер',desc:'Найбільше точних рахунків',
-    winner:sniper,value:`${partStats[sniper].exact} точних рахунків`,color:'var(--green2)'});
+    winner:joinNames(sn.names),value:`${sn.val} точних рахунків`,color:'var(--green2)'});
 
-  // 🧠 Тактик
-  const tactician=S.participants.reduce((best,n)=>partStats[n].result>partStats[best].result?n:best,S.participants[0]);
-  awards.push({icon:'🧠',title:'Тактик',desc:'Найбільше правильних результатів (В/Н/П)',
-    winner:tactician,value:`${partStats[tactician].result} правильних результатів`,color:'var(--blue3)'});
+  // 🧠 Тактик — найбільше вгаданих результатів В/Н/П (будь-який ненульовий)
+  const tac=leaders(n=>partStats[n].anyHit,'max');
+  awards.push({icon:'🧠',title:'Тактик',desc:'Найбільше вгаданих результатів матчу (В/Н/П)',
+    winner:joinNames(tac.names),value:`${tac.val} вгаданих результатів`,color:'var(--blue3)'});
 
-  // 💪 Стабільний — найменше нульових матчів
-  const stable=S.participants.reduce((best,n)=>partStats[n].zeroPts<partStats[best].zeroPts?n:best,S.participants[0]);
-  awards.push({icon:'💪',title:'Стабільний',desc:'Найменше матчів з 0 очок',
-    winner:stable,value:`${partStats[stable].zeroPts} нульових матчів`,color:'var(--green2)'});
+  // 🌟 Матч-очевидність — матчі (груп) з max учасників, що вгадали точний рахунок (≥2)
+  const maxExact=Math.max(...Object.values(matchStats).map(ms=>ms.exactCount),0);
+  if(maxExact>=2){
+    const obviousMatches=Object.values(matchStats).filter(ms=>ms.exactCount===maxExact);
+    awards.push({icon:'🌟',title:'Матч-очевидність',
+      desc:'Матчі, де найбільше учасників вгадали точний рахунок',
+      winner:obviousMatches.map(fmtMatch).join(' · '),
+      value:`${maxExact} учасників вгадали точний рахунок`,color:'var(--gold)',isMatch:true});
+  }
 
-  // 🎢 Хаотик — найбільший розкид
-  const chaotic=S.participants.reduce((best,n)=>partStats[n].variance>partStats[best].variance?n:best,S.participants[0]);
-  awards.push({icon:'🎢',title:'Хаотик',desc:'Найбільший розкид очок між матчами',
-    winner:chaotic,value:`Розкид ${partStats[chaotic].variance} очок`,color:'#ff9f43'});
+  // 💀 Матч-загадка — матчі, де ніхто з тих, хто прогнозував, не вгадав навіть результат
+  const mysteryMatches=Object.values(matchStats).filter(ms=>ms.N>0&&ms.zeroCount===ms.N);
+  awards.push({icon:'💀',title:'Матч-загадка',desc:'Матчі, де ніхто не вгадав навіть результат',
+    winner:mysteryMatches.length?mysteryMatches.map(fmtMatch).join(' · '):'Таких матчів ще немає 🙂',
+    value:mysteryMatches.length?`${mysteryMatches.length} матч(ів)`:'',color:'#ff6b6b',isMatch:true});
 
-  // 🌟 Матч туру — найбільше учасників вгадали точний рахунок
-  const bestMatchId=Object.entries(matchStats).reduce((best,[id,ms])=>ms.exactCount>matchStats[best]?.exactCount?id:best,Object.keys(matchStats)[0]);
-  const bm=matchStats[bestMatchId];
-  awards.push({icon:'🌟',title:'Матч туру',desc:'Найбільше учасників вгадали точний рахунок',
-    winner:bm?`${bm.home.n} ${bm.res.h}:${bm.res.a} ${bm.away.n}`:'—',
-    value:bm?`${bm.exactCount} учасників вгадали`:'' ,color:'var(--gold)',isMatch:true});
+  // 💰 Золоті матчі — топ-5 (матч+гравець) за zero-sum балансом (виграш)
+  const goldList=[...matchPlayerBal].sort((a,b)=>b.bal-a.bal).slice(0,5).filter(x=>x.bal>0);
+  if(goldList.length){
+    awards.push({icon:'💰',title:'Золоті матчі',
+      desc:`Топ-5 матчів, де учасник заробив найбільше (zero-sum серед тих, хто прогнозував; лише групові)`,
+      list:goldList.map(x=>({label:`${x.name} — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
+      color:'var(--gold)'});
+  }
 
-  // 💀 Матч-загадка — жоден не вгадав результат
-  const mysteryId=Object.entries(matchStats)
-    .filter(([,ms])=>ms.zeroCount===S.participants.length)
-    .sort(([,a],[,b])=>b.zeroCount-a.zeroCount)[0]?.[0];
-  const mm=mysteryId?matchStats[mysteryId]:null;
-  awards.push({icon:'💀',title:'Матч-загадка',desc:'Матч де ніхто не вгадав навіть результат',
-    winner:mm?`${mm.home.n} ${mm.res.h}:${mm.res.a} ${mm.away.n}`:'Таких матчів ще немає 🙂',
-    value:mm?`${mm.zeroCount} учасників з 0 очок`:'',color:'#ff6b6b',isMatch:true});
+  // 💸 Матч-невдача — топ-5 (матч+гравець) за найгіршим балансом
+  const failList=[...matchPlayerBal].sort((a,b)=>a.bal-b.bal).slice(0,5).filter(x=>x.bal<0);
+  if(failList.length){
+    awards.push({icon:'💸',title:'Матч-невдача',
+      desc:`Топ-5 матчів, де учасник втратив найбільше (zero-sum серед тих, хто прогнозував; лише групові)`,
+      list:failList.map(x=>({label:`${x.name} — ${fmtMatch(x)}`,val:fmtBal(x.bal)})),
+      color:'#ff6b6b'});
+  }
 
-  // 💰 Золотий матч — найбільше очок загалом
-  const goldMatchId=Object.entries(matchStats).reduce((best,[id,ms])=>ms.totalPts>(matchStats[best]?.totalPts||0)?id:best,Object.keys(matchStats)[0]);
-  const gm=matchStats[goldMatchId];
-  awards.push({icon:'💰',title:'Золотий матч',desc:'Матч що дав найбільше очок всім учасникам',
-    winner:gm?`${gm.home.n} ${gm.res.h}:${gm.res.a} ${gm.away.n}`:'—',
-    value:gm?`${gm.totalPts} очок загалом`:'',color:'var(--gold)',isMatch:true});
+  // 😴 Містер Нічия
+  const dm=leaders(n=>partStats[n].draws,'max');
+  awards.push({icon:'😴',title:'Містер Нічия',desc:`Найбільше прогнозованих нічиїх (з ${playedCount} зіграних матчів)`,
+    winner:joinNames(dm.names),value:`${dm.val} нічиїх`,color:'var(--muted)'});
 
-  // 😴 Містер Нічия — найбільше прогнозованих нічиїх
-  const drawMaster=S.participants.reduce((best,n)=>partStats[n].draws>partStats[best].draws?n:best,S.participants[0]);
-  awards.push({icon:'😴',title:'Містер Нічия',desc:'Найбільше прогнозованих нічиїх',
-    winner:drawMaster,value:`${partStats[drawMaster].draws} нічиїх`,color:'var(--muted)'});
+  // 🚀 Оптиміст / 🛡️ Песиміст
+  const opt=leaders(n=>partStats[n].totalGoalsPred,'max');
+  awards.push({icon:'🚀',title:'Оптиміст',desc:`Найбільше голів у прогнозах (з ${playedCount} зіграних матчів)`,
+    winner:joinNames(opt.names),value:`${opt.val} прогнозованих голів`,color:'#ff9f43'});
+  const pes=leaders(n=>partStats[n].totalGoalsPred,'min');
+  awards.push({icon:'🛡️',title:'Песиміст',desc:`Найменше голів у прогнозах (з ${playedCount} зіграних матчів)`,
+    winner:joinNames(pes.names),value:`${pes.val} прогнозованих голів`,color:'var(--blue3)'});
 
-  // 🚀 Оптиміст — найбільше прогнозованих голів загалом
-  const optimist=S.participants.reduce((best,n)=>partStats[n].totalGoalsPred>partStats[best].totalGoalsPred?n:best,S.participants[0]);
-  awards.push({icon:'🚀',title:'Оптиміст',desc:'Найбільше голів у прогнозах загалом',
-    winner:optimist,value:`${partStats[optimist].totalGoalsPred} прогнозованих голів`,color:'#ff9f43'});
-
-  // 🛡️ Песиміст — найменше прогнозованих голів
-  const pessimist=S.participants.reduce((best,n)=>partStats[n].totalGoalsPred<partStats[best].totalGoalsPred?n:best,S.participants[0]);
-  awards.push({icon:'🛡️',title:'Песиміст',desc:'Найменше голів у прогнозах загалом',
-    winner:pessimist,value:`${partStats[pessimist].totalGoalsPred} прогнозованих голів`,color:'var(--blue3)'});
-
-  // 💣 Диванний експерт — найбільше великих рахунків (5+ голів) що не справдились
-  const couch=S.participants.reduce((best,n)=>partStats[n].big>partStats[best].big?n:best,S.participants[0]);
-  awards.push({icon:'💣',title:'Диванний експерт',desc:'Найбільше прогнозів з великим рахунком (5+ голів)',
-    winner:couch,value:`${partStats[couch].big} великих рахунків`,color:'#ff6b6b'});
+  // 💣 Диванний експерт
+  const couch=leaders(n=>partStats[n].big,'max');
+  if(couch.val>0){
+    awards.push({icon:'💣',title:'Диванний експерт',desc:`Найбільше прогнозів з великим рахунком (5+ голів, з ${playedCount} зіграних)`,
+      winner:joinNames(couch.names),value:`${couch.val} великих рахунків`,color:'#ff6b6b'});
+  }
 
   // 🥅 0:0 спеціаліст
-  const zeroZero=S.participants.reduce((best,n)=>partStats[n].zero_zero>partStats[best].zero_zero?n:best,S.participants[0]);
-  if(partStats[zeroZero].zero_zero>0){
-    awards.push({icon:'🥅',title:'0:0 спеціаліст',desc:'Найбільше прогнозів з рахунком 0:0',
-      winner:zeroZero,value:`${partStats[zeroZero].zero_zero} нульових матчів`,color:'var(--muted)'});
+  const zz=leaders(n=>partStats[n].zero_zero,'max');
+  if(zz.val>0){
+    awards.push({icon:'🥅',title:'0:0 спеціаліст',desc:`Найбільше прогнозів з рахунком 0:0 (з ${playedCount} зіграних матчів)`,
+      winner:joinNames(zz.names),value:`${zz.val} прогнозів 0:0`,color:'var(--muted)'});
   }
 
-  // 👑 Лідер турніру
-  awards.unshift({icon:'👑',title:'Лідер турніру',desc:'Найбільше очок на даний момент',
-    winner:allData[0]?.n||'—',value:`${allData[0]?.total||0} очок`,color:'var(--gold)',featured:true});
-
-  // 😢 Команда-розчарування — команду прогнозували пізно, а вилетіла рано
-  // For each participant: find team predicted furthest, check how far it actually went
-  const teamDisappointments={};
-  S.participants.forEach(name=>{
-    const playoffs=S.predictions[name]?.playoffs||{};
-    // Find the round each team was predicted to reach
-    const predRounds={};
-    const roundOrder=['r32','r16','r8','r4','final'];
-    roundOrder.forEach(r=>{
-      (playoffs[r]||[]).forEach(t=>{if(!predRounds[t])predRounds[t]=r;});
-    });
-    if(playoffs.champion)predRounds[playoffs.champion]='champion';
-    // Find team predicted highest but real teams show it went out early
-    // Use playoffTeams to see real advancement
-    const realTeams=S.playoffTeams||{};
-    let worstDisap=null,worstScore=0;
-    Object.entries(predRounds).forEach(([team,predRound])=>{
-      const predIdx=roundOrder.indexOf(predRound==='champion'?'final':predRound);
-      // Check if team actually advanced (if real data available)
-      const realAdvanced=Object.values(realTeams).flat().includes(team);
-      if(predIdx>=2&&!realAdvanced&&Object.keys(realTeams).length>0){
-        if(predIdx+1>worstScore){worstScore=predIdx+1;worstDisap=team;}
-      }
-    });
-    if(worstDisap)teamDisappointments[name]=worstDisap;
-  });
-
-  // 🌠 Команда-недооцінка — команда що пройшла далі ніж прогнозували
-  const teamUnderrated={};
-  if(Object.keys(S.playoffTeams||{}).length>0){
-    const realTeams=S.playoffTeams;
-    const roundOrder=['r32','r16','r8','r4','final'];
-    allTeams().forEach(team=>{
-      // Find highest real round
-      let realHighest=-1;
-      roundOrder.forEach((r,i)=>{if((realTeams[r]||[]).includes(team))realHighest=i;});
-      if(realHighest<0)return;
-      // Find avg predicted round across participants
-      let totalPred=0,count=0;
-      S.participants.forEach(name=>{
-        const playoffs=S.predictions[name]?.playoffs||{};
-        let predHighest=-1;
-        roundOrder.forEach((r,i)=>{if((playoffs[r]||[]).includes(team))predHighest=i;});
-        totalPred+=predHighest;count++;
-      });
-      const avgPred=count>0?totalPred/count:-1;
-      if(realHighest>avgPred+1.5)teamUnderrated[team]=realHighest-avgPred;
-    });
-  }
-  const mostUnderrated=Object.entries(teamUnderrated).sort(([,a],[,b])=>b-a)[0];
-
-  // 🏅 Група-чемпіон — учасник що набрав найбільше очок за кожну групу
-  // We'll show which group each participant was best in
+  // ── Group scores (per participant per group) ──
   const groupScores={};
   S.participants.forEach(name=>{
     groupScores[name]={};
@@ -5450,52 +5426,91 @@ function renderAwards(){
       groupScores[name][g]=pts;
     });
   });
-  // Best group per participant
-  const bestGroups={};
-  S.participants.forEach(name=>{
-    const best=Object.entries(groupScores[name]).sort(([,a],[,b])=>b-a)[0];
-    if(best)bestGroups[name]={group:best[0],pts:best[1]};
-  });
-  // Who has best score in each group
+  // Найкращий результат у кожній групі
   const groupChampions={};
   Object.keys(GROUPS).forEach(g=>{
-    const best=S.participants.reduce((bst,n)=>{
-      return (groupScores[n][g]||0)>(groupScores[bst]?.[g]||0)?n:bst;
-    },S.participants[0]);
-    groupChampions[g]={winner:best,pts:groupScores[best]?.[g]||0};
+    let best=0;
+    S.participants.forEach(n=>{if((groupScores[n][g]||0)>best)best=groupScores[n][g];});
+    groupChampions[g]={winners:S.participants.filter(n=>(groupScores[n][g]||0)===best&&best>0),pts:best};
   });
-  // 💔 Група-облом — де найменше очок набрав учасник відносно інших
-  const groupOblom={};
-  S.participants.forEach(name=>{
-    const worst=Object.entries(groupScores[name]).sort(([,a],[,b])=>a-b)[0];
-    if(worst)groupOblom[name]={group:worst[0],pts:worst[1]};
-  });
-
-  // Add group champ/oblom awards
-  const topGroupChamp=Object.entries(groupChampions)
-    .sort(([,a],[,b])=>b.pts-a.pts)[0];
-  if(topGroupChamp&&topGroupChamp[1].pts>0){
+  // 🏅 Група-чемпіон — топ-3 (група, результат) за спаданням очок
+  const champEntries=Object.entries(groupChampions).filter(([,v])=>v.pts>0)
+    .sort(([,a],[,b])=>b.pts-a.pts).slice(0,3);
+  if(champEntries.length){
     awards.push({icon:'🏅',title:'Група-чемпіон',
-      desc:`Найкраще передбачив групу ${topGroupChamp[0]}`,
-      winner:topGroupChamp[1].winner,
-      value:`${topGroupChamp[1].pts} очок в групі ${topGroupChamp[0]}`,color:'var(--green2)'});
+      desc:'Топ-3 найкраще передбачених груп',
+      list:champEntries.map(([g,v])=>({label:`Група ${g}: ${joinNames(v.winners)}`,val:`${v.pts} очок`})),
+      color:'var(--green2)'});
   }
-  const worstGroupEntry=S.participants.map(n=>({n,g:groupOblom[n]?.group,pts:groupOblom[n]?.pts||0}))
-    .filter(x=>x.g).sort((a,b)=>a.pts-b.pts)[0];
-  if(worstGroupEntry){
+  // 💔 Група-облом — топ-3 найгірших (мін. очок у групі серед учасників, з реально зіграною групою)
+  const oblomCands=[];
+  Object.keys(GROUPS).forEach(g=>{
+    // лише групи, де є хоч один зіграний матч (інакше всі по 0 — нецікаво)
+    const anyPlayed=MATCH_PAIRS.some((_,k)=>{const r=S.matches[`g${g}${k}`];return r&&r.h!==''&&r.h!==undefined;});
+    if(!anyPlayed)return;
+    let worst=Infinity;
+    S.participants.forEach(n=>{if((groupScores[n][g]||0)<worst)worst=groupScores[n][g];});
+    const losers=S.participants.filter(n=>(groupScores[n][g]||0)===worst);
+    oblomCands.push({g,pts:worst,losers});
+  });
+  const oblomTop=oblomCands.sort((a,b)=>a.pts-b.pts).slice(0,3);
+  if(oblomTop.length){
     awards.push({icon:'💔',title:'Група-облом',
-      desc:`Найгірше передбачив групу ${worstGroupEntry.g}`,
-
-      winner:worstGroupEntry.n,
-      value:`${worstGroupEntry.pts} очок в групі ${worstGroupEntry.g}`,color:'#ff6b6b'});
+      desc:'Топ-3 найгірше передбачених груп',
+      list:oblomTop.map(o=>({label:`Група ${o.g}: ${joinNames(o.losers)}`,val:`${o.pts} очок`})),
+      color:'#ff6b6b'});
   }
+
+  // 😢 Команда-розчарування — прогнозував команду далеко, вона вилетіла рано
+  const teamDisappointments={};
+  S.participants.forEach(name=>{
+    const playoffs=S.predictions[name]?.playoffs||{};
+    const predRounds={};
+    const roundOrder=['r32','r16','r8','r4','final'];
+    roundOrder.forEach(r=>{(playoffs[r]||[]).forEach(t=>{if(!predRounds[t])predRounds[t]=r;});});
+    if(playoffs.champion)predRounds[playoffs.champion]='champion';
+    const realTeams=S.playoffTeams||{};
+    let worstDisap=null,worstScore=0;
+    Object.entries(predRounds).forEach(([team,predRound])=>{
+      const predIdx=roundOrder.indexOf(predRound==='champion'?'final':predRound);
+      const realAdvanced=Object.values(realTeams).flat().includes(team);
+      if(predIdx>=2&&!realAdvanced&&Object.keys(realTeams).length>0){
+        if(predIdx+1>worstScore){worstScore=predIdx+1;worstDisap=team;}
+      }
+    });
+    if(worstDisap)teamDisappointments[name]={team:worstDisap,score:worstScore};
+  });
   if(Object.keys(teamDisappointments).length>0){
-    const dispEntry=Object.entries(teamDisappointments)[0];
+    // показати всіх з максимальним score (tie)
+    const maxScore=Math.max(...Object.values(teamDisappointments).map(x=>x.score));
+    const disapList=Object.entries(teamDisappointments).filter(([,x])=>x.score===maxScore);
     awards.push({icon:'😢',title:'Команда-розчарування',
       desc:'Прогнозував команду далеко — вона вилетіла рано',
-      winner:`${dispEntry[0]}: ${dispEntry[1]}`,
-      value:'Команда не виправдала очікувань',color:'#ff6b6b'});
+      list:disapList.map(([nm,x])=>({label:`${nm}: ${x.team}`,val:''})),
+      color:'#ff6b6b'});
   }
+
+  // 🌠 Команда-недооцінка — команда пройшла далі ніж прогнозували
+  const teamUnderrated={};
+  if(Object.keys(S.playoffTeams||{}).length>0){
+    const realTeams=S.playoffTeams;
+    const roundOrder=['r32','r16','r8','r4','final'];
+    allTeams().forEach(team=>{
+      let realHighest=-1;
+      roundOrder.forEach((r,i)=>{if((realTeams[r]||[]).includes(team))realHighest=i;});
+      if(realHighest<0)return;
+      let totalPred=0,count=0;
+      S.participants.forEach(name=>{
+        const playoffs=S.predictions[name]?.playoffs||{};
+        let predHighest=-1;
+        roundOrder.forEach((r,i)=>{if((playoffs[r]||[]).includes(team))predHighest=i;});
+        totalPred+=predHighest;count++;
+      });
+      const avgPred=count>0?totalPred/count:-1;
+      if(realHighest>avgPred+1.5)teamUnderrated[team]=realHighest-avgPred;
+    });
+  }
+  const mostUnderrated=Object.entries(teamUnderrated).sort(([,a],[,b])=>b-a)[0];
   if(mostUnderrated){
     awards.push({icon:'🌠',title:'Команда-недооцінка',
       desc:'Команда пройшла далі ніж її прогнозували',
@@ -5503,8 +5518,7 @@ function renderAwards(){
       value:`На ${mostUnderrated[1].toFixed(1)} раунди далі прогнозу`,color:'var(--gold)'});
   }
 
-  // ── Render
-
+  // ── Render ──
   let html2=`<div style="margin-bottom:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <div style="font-size:13px;color:var(--muted)">Зіграно матчів</div>
     <div style="font-family:'Bebas Neue';font-size:28px;color:var(--gold)">${played.length}</div>
@@ -5516,34 +5530,43 @@ function renderAwards(){
   html2+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">`;
   awards.forEach(a=>{
     const isFeatured=a.featured;
+    let body;
+    if(a.list){
+      body=`<div style="display:flex;flex-direction:column;gap:6px;margin-top:.25rem">`+
+        a.list.map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+          <span style="font-size:13px;font-weight:600;color:${a.color}">${it.label}</span>
+          ${it.val?`<span style="font-size:12px;color:var(--muted);white-space:nowrap">${it.val}</span>`:''}
+        </div>`).join('')+`</div>`;
+    }else{
+      body=`<div style="font-size:${a.isMatch?'13px':'15px'};font-weight:${a.isMatch?'500':'700'};color:${a.color};margin-bottom:3px">${a.winner}</div>
+        ${a.value?`<div style="font-size:12px;color:var(--muted)">${a.value}</div>`:''}`;
+    }
     html2+=`<div style="background:var(--card);border:${isFeatured?'2px solid var(--gold)':'1px solid var(--border)'};border-radius:12px;padding:1.25rem;position:relative;overflow:hidden">
       ${isFeatured?`<div style="position:absolute;top:0;right:0;background:var(--gold);color:#000;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 12px 0 8px">ТОП</div>`:''}
       <div style="font-size:28px;margin-bottom:.5rem">${a.icon}</div>
       <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:#fff;margin-bottom:3px">${a.title}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:.75rem">${a.desc}</div>
-      <div style="font-size:${a.isMatch?'13px':'15px'};font-weight:${a.isMatch?'500':'700'};color:${a.color};margin-bottom:3px">${a.winner}</div>
-      ${a.value?`<div style="font-size:12px;color:var(--muted)">${a.value}</div>`:''}
+      ${body}
     </div>`;
   });
   html2+=`</div>`;
 
-  // ── Per-participant summary table
+  // ── Особиста статистика ──
   html2+=`<div style="margin-top:2rem"><div class="sec-title" style="font-size:20px">Особиста статистика</div>
     <div style="overflow-x:auto"><table class="lb-table">
       <thead><tr>
-        <th>Учасник</th><th class="r">Точних</th><th class="r">Результатів</th>
-        <th class="r">Різниць</th><th class="r">Нульових</th><th class="r">Голів у прогнозах</th>
+        <th>Учасник</th><th class="r">Точних (3)</th><th class="r">Різниць (2)</th>
+        <th class="r">Результатів (1)</th><th class="r">Нульових</th><th class="r">Голів у прогнозах</th>
         <th class="r">Нічиїх</th>
       </tr></thead><tbody>
       ${allData.map(p=>`<tr>
         <td style="font-weight:600">${p.n}</td>
         <td class="sub-cell" style="color:var(--green2)">${partStats[p.n]?.exact||0}</td>
-        <td class="sub-cell">${partStats[p.n]?.result||0}</td>
-        <td class="sub-cell">${partStats[p.n]?.diff||0}</td>
+        <td class="sub-cell">${partStats[p.n]?.diff2||0}</td>
+        <td class="sub-cell">${partStats[p.n]?.result1||0}</td>
         <td class="sub-cell" style="color:#ff6b6b">${partStats[p.n]?.zeroPts||0}</td>
         <td class="sub-cell">${partStats[p.n]?.totalGoalsPred||0}</td>
         <td class="sub-cell">${partStats[p.n]?.draws||0}</td>
-        
       </tr>`).join('')}
     </tbody></table></div>
   </div>`;

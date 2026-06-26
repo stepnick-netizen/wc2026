@@ -5410,6 +5410,45 @@ function renderAwards(){
       winner:joinNames(zz.names),value:`${zz.val} прогнозів 0:0`,color:'var(--muted)'});
   }
 
+  // ── Нагороди за прогноз фінальних таблиць груп ──
+  // detail.{groupPtsCount,goalDiffCount,placeCount} = к-ть влучань по дограних групах.
+  // Гроші — лише в «Гуру таблиць» (вся таблична фаза = замкнена zero-sum підмножина).
+  const detailOf={};
+  S.participants.forEach(n=>{detailOf[n]=calcPts(n).detail||{};});
+  const maxGP=Math.max(...S.participants.map(n=>detailOf[n].groupPtsCount||0),0);
+  const maxGD=Math.max(...S.participants.map(n=>detailOf[n].goalDiffCount||0),0);
+  const maxPL=Math.max(...S.participants.map(n=>detailOf[n].placeCount||0),0);
+
+  if(maxGP>0){
+    const w=leaders(n=>detailOf[n].groupPtsCount||0,'max');
+    awards.push({icon:'📊',title:'Майстер очок',desc:'Найточніше вгадав очки команд у таблицях груп',
+      winner:joinNames(w.names),value:`${w.val} вгаданих значень очок`,color:'var(--green2)'});
+  }
+  if(maxGD>0){
+    const w=leaders(n=>detailOf[n].goalDiffCount||0,'max');
+    awards.push({icon:'➕',title:'Майстер різниці',desc:'Найточніше вгадав різницю м\'ячів команд у групах',
+      winner:joinNames(w.names),value:`${w.val} вгаданих різниць`,color:'var(--gold)'});
+  }
+  if(maxPL>0){
+    const w=leaders(n=>detailOf[n].placeCount||0,'max');
+    awards.push({icon:'🪜',title:'Майстер позицій',desc:'Найточніше вгадав місця команд у групах',
+      winner:joinNames(w.names),value:`${w.val} вгаданих місць`,color:'var(--blue3)'});
+  }
+  // 🧮 Гуру таблиць — сума влучань усіх трьох + груповий баланс у грошах (zero-sum по всіх)
+  if(maxGP>0||maxGD>0||maxPL>0){
+    const guruHits=n=>(detailOf[n].groupPtsCount||0)+(detailOf[n].goalDiffCount||0)+(detailOf[n].placeCount||0);
+    const gw=leaders(guruHits,'max');
+    // груповий баланс: groupPts (табличні очки) кожного, N=всі учасники, zero-sum
+    const N=S.participants.length;
+    const gpts={};S.participants.forEach(n=>{gpts[n]=calcPts(n).groupPts||0;});
+    const sumGpts=S.participants.reduce((s,n)=>s+gpts[n],0);
+    const guruBal=n=>Math.round((N*gpts[n]-sumGpts)*rate);
+    const balStr=gw.names.map(n=>fmtBal(guruBal(n))).join(', ');
+    awards.push({icon:'🧮',title:'Гуру таблиць',
+      desc:`Найбільше влучань по таблицях груп разом (очки+різниця+місця); баланс — zero-sum за табличну фазу серед усіх ${N}`,
+      winner:joinNames(gw.names),value:`${gw.val} влучань · ${balStr}`,color:'var(--gold)'});
+  }
+
   // ── Group scores (per participant per group) ──
   const groupScores={};
   S.participants.forEach(name=>{

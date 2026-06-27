@@ -6746,22 +6746,6 @@ function saveThird(){
 function aBonus(){
   const br=S.bonusRound||{active:false,label:'Бонусний раунд',ptsScore:3,ptsDiff:2,ptsResult:1,
     ptsR16:4,ptsR8:6,ptsR4:8,ptsFinal:10,ptsChamp:15,nomPts:10};
-  // Build slots html — starting from 1/8 (r32 already known)
-  let slotsHtml='';
-  PLAYOFF_ROUNDS.forEach(round=>{
-    if(round.id==='r32')return; // 1/16 вже відома
-    slotsHtml+=`<div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin:12px 0 6px">${round.label.toUpperCase()} (${round.n} матчів)</div>`;
-    for(let i=0;i<round.n;i++){
-      const mid=`b_${round.id}_${i}`;
-      const slot=(br.slots||{})[mid]||{};
-      slotsHtml+=`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
-        <span style="color:var(--muted);min-width:24px">${i+1}</span>
-        <input type="text" id="bs-${round.id}-h-${i}" value="${slot.home||''}" placeholder="Команда A" style="flex:1;padding:5px 8px;font-size:12px">
-        <span style="color:var(--muted)">vs</span>
-        <input type="text" id="bs-${round.id}-a-${i}" value="${slot.away||''}" placeholder="Команда B" style="flex:1;padding:5px 8px;font-size:12px">
-      </div>`;
-    }
-  });
   return`<div class="apanel-title">Бонусний раунд</div>
     <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
       <input type="checkbox" id="br-active" ${br.active?'checked':''} style="accent-color:var(--red)"> Активувати бонусний раунд
@@ -6792,7 +6776,6 @@ function aBonus(){
       </div>
     </div>
     <p style="font-size:11px;color:var(--muted);margin-top:4px">Окрема ставка тільки для бонусного раунду. Основна ставка: 1 очко = ${(S.currency||{rate:1}).rate} ${(S.currency||{code:'UAH'}).code}</p>
-    <div class="form-group" style="margin-top:1rem"><label class="form-label">Пари матчів по раундах</label>${slotsHtml}</div>
     <div style="margin-top:1rem;display:flex;align-items:center;gap:10px"><button class="btn btn-red btn-sm" onclick="saveBonus()">Зберегти</button><span id="brok" style="display:none" class="save-ok">✓</span></div>`;
 }
 function saveBonus(){
@@ -6809,16 +6792,6 @@ function saveBonus(){
   S.bonusRound.ptsChamp=+document.getElementById('br-pts-champ').value;
   S.bonusRound.nomPts=+document.getElementById('br-pts-nom').value;
   S.bonusRound.rate=+document.getElementById('br-rate').value||1;
-  if(!S.bonusRound.slots)S.bonusRound.slots={};
-  PLAYOFF_ROUNDS.forEach(round=>{
-    if(round.id==='r32')return;
-    for(let i=0;i<round.n;i++){
-      const mid=`b_${round.id}_${i}`;
-      const h=document.getElementById(`bs-${round.id}-h-${i}`)?.value.trim()||'';
-      const a=document.getElementById(`bs-${round.id}-a-${i}`)?.value.trim()||'';
-      S.bonusRound.slots[mid]={home:h,away:a};
-    }
-  });
   save();document.getElementById('brok').style.display='inline';setTimeout(()=>document.getElementById('brok').style.display='none',2000);toast('Збережено!');
   if(typeof syncBracketBonusTab==='function')syncBracketBonusTab();}
 

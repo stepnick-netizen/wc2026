@@ -1421,12 +1421,13 @@ function calcDetailedPts(name){
   (S.nominations||[]).forEach(n=>{if(n.winner&&(pred.nominations||{})[n.id]===n.winner)nomPts+=n.pts;});
 
   // Bonus round — separate, full playoff 1/16→final+champ+noms
-  let bonusPts=0,bExact=0,bResult=0,bR32=0,bR16=0,bR8=0,bR4=0,bFin=0,bChamp=0,bNom=0;
+  let bonusPts=0,bExact=0,bResult=0,bScorePts=0,bR32=0,bR16=0,bR8=0,bR4=0,bFin=0,bChamp=0,bNom=0;
   if(S.bonusRound?.active){
     const br=S.bonusRound,bpred=br.predictions[name]||{},bpm=bpred.matches||{};
     // Match scores for bonus rounds (1/8 onward) — compare vs real bracket results
     PLAYOFF_ROUNDS.forEach(round=>{
-      if(round.id==='r32'||round.id==='third')return; // bonus starts from r16 matches
+      if(round.id==='third')return; // у бонусі немає матчу за 3-тє
+      // ── РАХУНКИ матчів: рахуються з 1/16 (b_r32) і далі ──
       for(let i=0;i<round.n;i++){
         const mid=`b_${round.id}_${i}`;
         const p=bpm[mid];
@@ -1436,9 +1437,12 @@ function calcDetailedPts(name){
         const res=S.matches[realMid]||(br.results||{})[mid];
         if(!res||res.h===''||res.h===undefined)continue;
         const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,{exact:br.ptsScore,result:br.ptsResult,diff:br.ptsDiff||0});
-        bonusPts+=sc.exact+sc.result;
+        bonusPts+=sc.exact+sc.result+sc.diff;
+        bScorePts+=sc.exact+sc.result+sc.diff;
         if(sc.exact)bExact++; else if(sc.result)bResult++;
       }
+      // ── КОМАНДНІ бали (прохід команди): стартують з 1/8 (r16). Для 1/16 їх немає ──
+      if(round.id==='r32'){return;}
       const pTeams=(bpred.playoffs||{})[round.id]||[];
       // Derive real advanced teams from actual bracket results automatically
       const getRealAdvanced=(roundId)=>{
@@ -1501,7 +1505,7 @@ function calcDetailedPts(name){
   return{matchPts,matchPtsGroup,matchPtsPlayoff,groupPts,r32,r16,r8,r4,fin,champ,nomPts,total,bonusPts,
     poolGroup,poolPlayoff,poolNoms,
     detail:{exactCount,resultCount,diffCount,groupPtsCount,goalDiffCount,placeCount},
-    bonusDetail:{bExact,bResult,bR32,bR16,bR8,bR4,bFin,bChamp,bNom}};
+    bonusDetail:{bExact,bResult,bScorePts,bR32,bR16,bR8,bR4,bFin,bChamp,bNom}};
 }
 
 function calcPts(name){return calcDetailedPts(name);}
@@ -5964,7 +5968,7 @@ function renderLeaderboard(){
           const bal=calcBonusBalance(p.n,bonusParticipants);
           const balEl=bal>=0?`<td class="uah-pos">+${bal} ${bCode}</td>`:`<td class="uah-neg">${bal} ${bCode}</td>`;
           return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${p.n}</td>
-            <td class="sub-cell">${(bd.bExact||0)+(bd.bResult||0)>0?(bd.bExact||0)*3+(bd.bResult||0):0}</td>
+            <td class="sub-cell">${bd.bScorePts||0}</td>
             <td class="sub-cell">${bd.bR16||0}</td>
             <td class="sub-cell">${bd.bR8||0}</td><td class="sub-cell">${bd.bR4||0}</td>
             <td class="sub-cell">${bd.bFin||0}</td><td class="sub-cell">${bd.bChamp||0}</td>

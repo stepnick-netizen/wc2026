@@ -1120,6 +1120,23 @@ async function loadFromSheets(){
     if(predsRes.ok && predsRes.data){
       S.predictions=predsRes.data;
     }
+    // Завантажуємо бонусні прогнози з окремого аркуша.
+    // Merge: аркуш має пріоритет, але старі бонуси зі state (legacy) виживають.
+    const bonusRes=await sheetsGet({action:'getAllBonusPredictions'});
+    if(bonusRes.ok && bonusRes.data){
+      if(!S.bonusRound)S.bonusRound={};
+      const legacy=S.bonusRound.predictions||{};
+      const sheetBonus=bonusRes.data;
+      S.bonusRound.predictions={...legacy,...sheetBonus};
+      // Одноразова міграція: бонуси, що лишилися лише в state (legacy),
+      // переносимо в новий аркуш, щоб вони не зникли при наступному saveState.
+      Object.keys(legacy).forEach(nm=>{
+        if(!sheetBonus[nm]){
+          sheetsPost({action:'saveBonusPrediction',name:nm,data:legacy[nm]})
+            .catch(err=>console.warn('Sheets bonus migration failed:',nm,err));
+        }
+      });
+    }
     console.log('Дані завантажено з Sheets');
     return true;
   }catch(err){
@@ -1187,10 +1204,32 @@ function save(){
     toast('⚠️ Не вдалося зберегти локально!');
     console.error('save() localStorage failed:',err);
   }
-  // 2. Синхронізуємо глобальний стан в Sheets (без прогнозів)
+  // 2. Синхронізуємо глобальний стан в Sheets (без прогнозів).
+  //    Бонусні прогнози учасників живуть в окремому аркуші bonusPredictions,
+  //    тому виключаємо S.bonusRound.predictions зі state — інакше saveState
+  //    одного гравця затирав би бонуси інших (per-player merge відсутній у state).
   const {predictions,...stateWithoutPreds}=rest;
+  if(stateWithoutPreds.bonusRound){
+    const {predictions:_bp,...brNoPreds}=stateWithoutPreds.bonusRound;
+    stateWithoutPreds.bonusRound={...brNoPreds,predictions:{}};
+  }
   sheetsPost({action:'saveState',data:stateWithoutPreds})
     .catch(err=>console.warn('Sheets saveState failed:',err));
+}
+function saveBonusPredToSheets(name){
+  const br=S.bonusRound;
+  if(!br||!br.predictions||!br.predictions[name])return;
+  sheetsPost({action:'saveBonusPrediction',name,data:br.predictions[name]})
+    .then(res=>{
+      // Сервер міг тихо відхилити (минув бонус-дедлайн) — показуємо це,
+      // інакше тост «збережено» бреше, а в аркуш нічого не пише.
+      if(res&&res.ok===false){
+        console.warn('saveBonusPrediction rejected:',res.reason);
+        if(res.reason==='bonus_deadline_passed')toast('🔒 Сервер: дедлайн бонусу пройшов — не збережено.');
+        else toast('⚠️ Бонус не збережено на сервері: '+(res.reason||'невідома причина'));
+      }
+    })
+    .catch(err=>console.warn('Sheets saveBonusPrediction failed:',err));
 }
 function savePredToSheets(name){
   const pred=S.predictions[name];
@@ -3902,7 +3941,7 @@ function savePredictions(){
     if(!(S.bonusRound&&S.bonusRound.active)){toast('Бонусний раунд неактивний');return;}
     _saveBonusQuick(user);
     save();
-    savePredToSheets(user);
+    saveBonusPredToSheets(user);
     var _okB=document.getElementById('pred-ok');if(_okB){_okB.style.display='inline';setTimeout(function(){_okB.style.display='none';},2000);}
     toast('Бонусний прогноз збережено!');
     renderPredContent();

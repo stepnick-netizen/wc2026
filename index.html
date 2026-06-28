@@ -101,6 +101,9 @@ nav{background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;
   .le-detail{display:none!important;}
   .le-mob{display:none!important;}
 }
+/* Двоколонковий live-детейл: розкривний accordion на всіх ширинах */
+.le-detail2{display:none;}
+.le-detail2.open{display:block;}
 .rank-cell{font-family:'Bebas Neue';font-size:20px;width:36px;}
 .gold-rank{color:var(--gold);}
 .silver-rank{color:#aab8c2;}
@@ -6405,16 +6408,39 @@ function renderLive(){
         }
         return s;
       }
+      // блок деталей однієї каси всередині accordion: при якому рахунку макс/мін
+      function poolDetail(label, pr, e){
+        if(!pr||!e)return '';
+        let d='<div style="margin-top:.4rem"><div style="font-weight:700;color:var(--gold);font-size:12px;margin-bottom:2px">'+label+' ('+pr.h+':'+pr.a+')</div>';
+        if(hasRes&&e.now!==null){
+          const ncol=e.now>0?'var(--green2)':e.now<0?'#ff6b6b':'var(--muted)';
+          d+='<div><span style="font-weight:700;color:'+ncol+'">● Зараз ('+res.h+':'+res.a+'):</span> '+fmtE(e.now)+'</div>';
+        }
+        d+='<div><span class="le-best" style="font-weight:700">▲ Найкраще:</span> '+fmtE(e.best)+' <span class="le-tag">(якщо вгадає точний рахунок '+pr.h+':'+pr.a+')</span></div>';
+        d+='<div><span class="le-worst" style="font-weight:700">▼ Найгірше:</span> '+fmtE(e.worst)+' <span class="le-tag">(якщо буде '+e.worstScore.h+':'+e.worstScore.a+')</span></div>';
+        d+='</div>';
+        return d;
+      }
       html+='<div style="display:grid;grid-template-columns:1fr 110px 110px;gap:0;padding:.4rem 1rem;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">';
       html+='<span>Учасник</span><span style="text-align:center">📅 До турніру</span><span style="text-align:center">🎯 Бонус</span></div>';
       html+='<div style="padding:.25rem 0">';
       rows.forEach(r=>{
         // До турніру: ставив, але пара мимо → прочерк; не ставив → хрестик
         const baseEmpty=r.baseStaked?'dash':'cross';
+        const eB=econBase[r.n], eN=econBonus[r.n];
+        const hasDetail=(r.base&&eB)||(r.bonus&&eN);
+        html+='<div class="le-row" onclick="this.querySelector(\'.le-detail2\')&&this.querySelector(\'.le-detail2\').classList.toggle(\'open\')" style="'+(hasDetail?'cursor:pointer':'')+'">';
         html+='<div style="display:grid;grid-template-columns:1fr 110px 110px;gap:0;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
-        html+='<span style="font-size:14px;font-weight:600">'+escapeHtml(r.n)+'</span>';
-        html+='<span style="text-align:center">'+poolCell(r.base, econBase[r.n], baseEmpty)+'</span>';
-        html+='<span style="text-align:center">'+poolCell(r.bonus, econBonus[r.n], 'cross')+'</span>';
+        html+='<span style="font-size:14px;font-weight:600">'+escapeHtml(r.n)+(hasDetail?' <span style="color:var(--muted);font-size:11px">▾</span>':'')+'</span>';
+        html+='<span style="text-align:center">'+poolCell(r.base, eB, baseEmpty)+'</span>';
+        html+='<span style="text-align:center">'+poolCell(r.bonus, eN, 'cross')+'</span>';
+        html+='</div>';
+        if(hasDetail){
+          html+='<div class="le-detail2" style="padding:.5rem 1rem .7rem;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;line-height:1.6">';
+          html+=poolDetail('📅 До турніру', r.base, eB);
+          html+=poolDetail('🎯 Бонус', r.bonus, eN);
+          html+='</div>';
+        }
         html+='</div>';
       });
       html+='</div>';

@@ -5813,30 +5813,24 @@ function renderSummaryTable(){
       +'</tr>';
   }).join('');
 
-  // ── Банк кожної каси = сума додатних балансів у цій касі (zero-sum: =|від'ємних|) ──
+  // ── Підсумковий рядок «Загальна каса»: банк кожної каси (сума додатних балансів) ──
   const bank=arr=>arr.reduce((s,v)=>s+(v>0?v:0),0);
   const bankGroup=bank(rows.map(r=>r.bd.group));
   const bankPlay=bank(rows.map(r=>r.bd.playoff));
   const bankNoms=bank(rows.map(r=>r.bd.noms));
   const bankBonus=bank(rows.map(r=>r.bd.bonus));
   const bankTotal=bankGroup+bankPlay+bankNoms+bankBonus;
-  function cashRow(label,val,strong){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;'
-      +'padding:.55rem .9rem;'+(strong?'border-top:2px solid var(--border);margin-top:.25rem':'border-top:1px solid var(--border)')+'">'
-      +'<span style="font-size:13px;'+(strong?'font-weight:700;color:var(--text)':'color:var(--muted)')+'">'+label+'</span>'
-      +'<span style="font-family:\'Bebas Neue\';font-size:'+(strong?'26px':'20px')+';color:var(--gold)">'+val+' '+code+'</span></div>';
-  }
-  let cashPanel='<div style="margin:.5rem 0 1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">'
-    +'<div style="padding:.6rem .9rem;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:var(--bg3)">💰 Каса по етапах</div>'
-    +cashRow('🥅 Групи',bankGroup,false)
-    +cashRow('🏟️ Плей-оф',bankPlay,false)
-    +cashRow('🏅 Номінації',bankNoms,false)
-    +(bonusActive?cashRow('🎯 Бонус',bankBonus,false):'')
-    +cashRow('РАЗОМ',bankTotal,true)
-    +'</div>';
+  const bankCell=v=>'<td class="r" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold)">'+v+' '+code+'</td>';
+  const footCols=bankCell(bankGroup)+bankCell(bankPlay)+bankCell(bankNoms)+(bonusActive?bankCell(bankBonus):'');
+  const foot='<tfoot><tr style="border-top:2px solid var(--border)">'
+    +'<td></td><td class="name-cell" style="color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:12px">💰 Загальна каса</td>'
+    +footCols
+    +'<td></td>'  // Σ Очки — порожньо
+    +bankCell(bankTotal)  // Σ Баланс → повна каса
+    +'</tr></tfoot>';
 
   host.innerHTML='<div style="margin:.5rem 0 1rem">'
-    +'<p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Зведення по всіх касах. Кожна каса — окремий zero-sum пул. «—» — гравець не бере участі в цій касі. Формат: <b style="color:var(--text)">очки / гроші</b>.</p>'
+    +'<p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Зведення по всіх касах. Кожна каса — окремий zero-sum пул. «—» — гравець не бере участі в цій касі. Формат: <b style="color:var(--text)">очки / гроші</b>. Останній рядок — банк кожної каси (загальна каса).</p>'
     +'<div class="scen-wrap"><table class="lb-table"><thead><tr>'
     +'<th>#</th><th>Учасник</th>'
     +'<th class="r">🥅 Групи<br><span style="font-weight:400;color:var(--muted);font-size:10px">очки / грн</span></th>'
@@ -5844,8 +5838,7 @@ function renderSummaryTable(){
     +'<th class="r">🏅 Номінації<br><span style="font-weight:400;color:var(--muted);font-size:10px">очки / грн</span></th>'
     +bonusCol
     +'<th class="r">Σ Очки</th><th class="r">Σ Баланс</th>'
-    +'</tr></thead><tbody>'+body+'</tbody></table></div>'
-    +cashPanel+'</div>';
+    +'</tr></thead><tbody>'+body+'</tbody>'+foot+'</table></div></div>';
 }
 
 function renderLeaderboard(){
@@ -5924,46 +5917,10 @@ function renderLeaderboard(){
       </table></div>
     </div>`;
 
-  // Combined totals table
+  // Стара таблиця «Загальний підсумок» прибрана — її замінює зведена таблиця
+  // по касах зверху сторінки (renderSummaryTable) з коректними касовими балансами.
   const combinedSection=document.getElementById('lb-combined-section');
-  if(!combinedSection)return;
-  const allPart=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>(b.total+b.bonusPts)-(a.total+a.bonusPts));
-  const combinedMax=(allPart[0]?.total||0)+(allPart[0]?.bonusPts||0)||1;
-  const mainRate=curr.rate||1;
-  combinedSection.innerHTML=`
-    <div style="margin-top:2rem">
-      <div class="sec-title" style="font-size:18px">📊 Загальний підсумок</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Основні очки + Бонусні очки</p>
-      <div class="lb-wrap"><table class="lb-table">
-        <thead><tr>
-          <th>#</th><th>Учасник</th>
-          <th class="r">Основні</th>
-          <th class="r">Бонус</th>
-          <th class="r" style="color:var(--gold)">Всього</th>
-          <th class="r">Баланс</th>
-          <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
-        </tr></thead>
-        <tbody>${allPart.map((p,i)=>{
-          const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
-          const combined=p.total+p.bonusPts;
-          // Баланс: основний (від загальних очок) + бонусний (окрема каса)
-          const mainBal=calcBalance(p.n, allPart, mainRate);
-          const bonusParts2=getBonusParticipants();
-          const bonusBal=bonusParts2.includes(p.n)?calcBonusBalance(p.n,bonusParts2):0;
-          const totalBal=mainBal+bonusBal;
-          const balEl=totalBal>=0?`<td class="uah-pos">+${totalBal} ${bCode}</td>`:`<td class="uah-neg">${totalBal} ${bCode}</td>`;
-          return`<tr>
-            <td class="rank-cell ${rc}">${r}</td>
-            <td class="name-cell">${p.n}</td>
-            <td class="sub-cell">${p.total}</td>
-            <td class="sub-cell" style="color:var(--blue3)">${p.bonusPts||0}</td>
-            <td class="pts-cell" style="color:var(--gold)">${combined}</td>
-            ${balEl}
-            ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>`;
+  if(combinedSection)combinedSection.innerHTML='';
 }
 
 // ══════════════════════════════════════════════════════════════════

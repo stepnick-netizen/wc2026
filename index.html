@@ -5724,9 +5724,9 @@ function renderPoolTables(){
         bd=bc(d.exactCount||0)+bc(d.diffCount||0)+bc(d.resultCount||0)
           +bc(d.groupPtsCount||0)+bc(d.goalDiffCount||0)+bc(d.placeCount||0);
       }
-      let accCell='<td class="r" style="color:var(--muted)">·</td>';
+      let accCell='<td class="r pool-col" style="color:var(--muted)">·</td>';
       const acc=matchAccuracy(row.n);
-      if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
+      if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r pool-col" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
         ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
         ${accCell}</tr>`;
@@ -5766,7 +5766,7 @@ function renderPoolTables(){
       ${infoBlock}
       ${scrollHint}
       <div class="${wrapCls}"><table class="lb-table">
-        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th></tr></thead>
+        <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th><th class="r pool-col" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th></tr></thead>
         <tbody>${body}</tbody>
       </table></div></div>`;
   }

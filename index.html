@@ -949,7 +949,7 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
       <th class="r" data-i18n="col_champ">Чемп.</th>
       <th class="r" data-i18n="col_noms">Номін.</th>
       <th class="r" data-i18n="col_total">Очки</th>
-      <th class="r" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
+      <th class="r pool-col" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
     </tr></thead>
     <tbody id="lb-body"></tbody>
   </table></div>
@@ -5824,7 +5824,7 @@ function renderSummaryTable(){
       +cell(row.inN,row.ptsNom,row.bd.noms)
       +bonusCell
       +'<td class="pts-cell">'+row.grandPts+'</td>'
-      +'<td class="'+moneyCls(row.grandBal)+'" style="font-weight:700">'+money(row.grandBal)+'</td>'
+      +'<td class="pool-col '+moneyCls(row.grandBal)+'" style="font-weight:700;font-variant-numeric:tabular-nums">'+money(row.grandBal)+'</td>'
       +'</tr>';
   }).join('');
 
@@ -5836,7 +5836,7 @@ function renderSummaryTable(){
   const bankBonus=bank(rows.map(r=>r.bd.bonus));
   const bankTotal=bankGroup+bankPlay+bankNoms+bankBonus;
   const bankCell=v=>'<td class="r pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
-  const bankCellR=v=>'<td class="r" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
+  const bankCellR=v=>'<td class="pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
   const footCols=bankCell(bankGroup)+bankCell(bankPlay)+bankCell(bankNoms)+(bonusActive?bankCell(bankBonus):'');
   const foot='<tfoot><tr style="border-top:2px solid var(--border)">'
     +'<td></td><td class="name-cell" style="color:var(--muted);font-size:13px;font-weight:700">💰 Загальна каса</td>'
@@ -5853,7 +5853,7 @@ function renderSummaryTable(){
     +'<th class="r pool-col">🏟️ Плей-оф<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
     +'<th class="r pool-col">🏅 Номінації<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
     +bonusCol
-    +'<th class="r">Σ Очки</th><th class="r">Σ Баланс</th>'
+    +'<th class="r">Σ Очки</th><th class="r pool-col">Σ Баланс</th>'
     +'</tr></thead><tbody>'+body+'</tbody>'+foot+'</table></div></div>';
 }
 
@@ -5875,7 +5875,7 @@ function renderLeaderboard(){
       ${poCell(p.fin)}${poCell(p.champ)}
       ${nmCell(p.nomPts)}
       <td class="pts-cell">${p.total}</td>
-      ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
+      ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r pool-col" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r pool-col" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
     </tr>`;
   }).join('');
 

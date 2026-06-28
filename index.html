@@ -3798,10 +3798,10 @@ function renderPredBonus(pred,dis,el){
         <span style="color:var(--gold);font-weight:600">Нічия — хто проходить?</span>
         <div style="display:flex;gap:8px;margin-top:4px">
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px">
-            <input type="radio" name="bwinner-${mid}" data-bwinner="${mid}" value="${home}" ${winner===home?'checked':''} style="accent-color:var(--gold)"> ${home}
+            <input type="radio" name="bwinner-${mid}" data-bwinner="${mid}" value="${home}" ${winner===home?'checked':''} onchange="onBonusInput('${mid}','${home}','${away}')" style="accent-color:var(--gold)"> ${home}
           </label>
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px">
-            <input type="radio" name="bwinner-${mid}" data-bwinner="${mid}" value="${away}" ${winner===away?'checked':''} style="accent-color:var(--gold)"> ${away}
+            <input type="radio" name="bwinner-${mid}" data-bwinner="${mid}" value="${away}" ${winner===away?'checked':''} onchange="onBonusInput('${mid}','${home}','${away}')" style="accent-color:var(--gold)"> ${away}
           </label>
         </div>
       </div>`:''}

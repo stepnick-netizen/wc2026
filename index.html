@@ -6204,19 +6204,25 @@ function syncLiveTab(){
 // best  = я вгадую точно (R = мій прогноз), opponents рахуються проти мого R.
 // worst = серед усіх рахунків, які поставили опоненти, той що дає мені мін. баланс.
 function liveMatchEconomics(preds, rate, currentR, scoring){
-  // preds: [{n, h, a}] — валідні прогнози на цей матч
+  // preds: [{n, h, a, zero?}] — учасники каси на цьому матчі.
+  //   zero=true → гравець у касі, але за цей матч завжди отримує 0 балів
+  //   (зробив base-прогноз, але передбачена пара не збіглася з реальною).
   // currentR: {h,a}|null — поточний рахунок адміна (для колонки «Зараз»)
   // scoring: {exact,result,diff} — система балів (за замовч. основна S.scoring)
   const N=preds.length, r=+rate||1;
   const sco=scoring||S.scoring;
   if(N<2)return {}; // каса з одного гравця сенсу не має
   const out={};
+  function ptsK(k, R){
+    // бали гравця k за рахунку R; для zero-гравця завжди 0
+    if(preds[k].zero)return 0;
+    const sc=scoreMatch(R.h,R.a,preds[k].h,preds[k].a,sco);
+    return sc.exact+sc.result+sc.diff;
+  }
   function balFor(meIdx, R){
-    // R = {h,a}. ptsK = очки гравця K за його прогноз проти R.
     let mePts=0, sum=0;
     for(let k=0;k<N;k++){
-      const sc=scoreMatch(R.h,R.a,preds[k].h,preds[k].a,sco);
-      const pk=sc.exact+sc.result+sc.diff;
+      const pk=ptsK(k,R);
       sum+=pk;
       if(k===meIdx)mePts=pk;
     }
@@ -6228,8 +6234,17 @@ function liveMatchEconomics(preds, rate, currentR, scoring){
   const cur=(currentR&&currentR.h!==''&&currentR.h!==undefined&&currentR.a!==''&&currentR.a!==undefined)
     ?{h:+currentR.h,a:+currentR.a}:null;
   for(let i=0;i<N;i++){
-    // best: R = мій власний прогноз
-    const best=balFor(i,{h:preds[i].h,a:preds[i].a});
+    // best: для звичайного гравця R = його прогноз (вгадав точно);
+    //       для zero-гравця він не може заробити — best це найкращий для нього випадок
+    //       серед рахунків опонентів (його 0 фіксований, виграє хто менше набрав).
+    let best;
+    if(preds[i].zero){
+      let bestBal=-Infinity, bestR=null;
+      uniq.forEach(R=>{const b=balFor(i,R).bal; if(b>bestBal){bestBal=b;bestR=R;}});
+      best={bal:bestBal, score:bestR};
+    } else {
+      best={bal:balFor(i,{h:preds[i].h,a:preds[i].a}).bal, score:{h:preds[i].h,a:preds[i].a}};
+    }
     // worst: перебір рахунків опонентів
     let worstBal=Infinity, worstR=null;
     uniq.forEach(R=>{
@@ -6238,7 +6253,7 @@ function liveMatchEconomics(preds, rate, currentR, scoring){
     });
     // now: за поточним рахунком адміна
     const now=cur?Math.round(balFor(i,cur).bal):null;
-    out[preds[i].n]={best:Math.round(best.bal), worst:Math.round(worstBal), worstScore:worstR, now};
+    out[preds[i].n]={best:Math.round(best.bal), bestScore:best.score, worst:Math.round(worstBal), worstScore:worstR, now, zero:!!preds[i].zero};
   }
   return out;
 }
@@ -6341,14 +6356,21 @@ function renderLive(){
       const p=((S.predictions[n]||{}).matches||{})[mid];
       return !!(p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined);
     }
+    // Сирий рахунок base-ставки на цей матч (незалежно від звірки пари).
+    function baseRawFor(n){
+      const p=((S.predictions[n]||{}).matches||{})[mid];
+      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return null;
+      return {h:+p.h,a:+p.a};
+    }
     // Збираємо по учаснику обидві каси
     const rows=[];
     (S.participants||[]).forEach(n=>{
       const base=basePredFor(n);
       const bonus=bonusPredFor(n);
       const baseStaked=hasBaseStake(n);
+      const baseRaw=baseRawFor(n);
       // Залишаємо всіх, хто брав участь хоч у якійсь касі (base/bonus прогноз або сам факт ставки base)
-      if(base||bonus||baseStaked)rows.push({n, base, bonus, baseStaked});
+      if(base||bonus||baseStaked)rows.push({n, base, bonus, baseStaked, baseRaw});
     });
 
     // Підсвітка влучень
@@ -6382,8 +6404,11 @@ function renderLive(){
       const rate=curr.rate||1;
       const nowR=hasRes?{h:res.h,a:res.a}:null;
       const fmtE=v=>(v>0?'+':'')+v+' '+code;
-      // Економіка кожної каси окремо (своя система балів)
-      const baseList=rows.filter(r=>r.base).map(r=>({n:r.n,h:r.base.h,a:r.base.a}));
+      // Економіка кожної каси окремо (своя система балів).
+      // «До турніру»: у касу входять УСІ, хто зробив base-ставку на цей матч.
+      //   Хто вгадав пару → грає своїм рахунком. Хто не вгадав пару → zero=true
+      //   (за офіційними правилами за цей матч отримує 0, але бере участь у zero-sum).
+      const baseList=rows.filter(r=>r.baseRaw).map(r=>({n:r.n,h:r.baseRaw.h,a:r.baseRaw.a,zero:!r.base}));
       const bonusList=rows.filter(r=>r.bonus).map(r=>({n:r.n,h:r.bonus.h,a:r.bonus.a}));
       const br=S.bonusRound||{};
       const bonusSco={exact:br.ptsScore||3, result:br.ptsResult||1, diff:br.ptsDiff||0};
@@ -6391,11 +6416,20 @@ function renderLive(){
       const econBonus=liveMatchEconomics(bonusList, br.rate||rate, nowR, bonusSco);
       const hasEconB=Object.keys(econBase).length>0;
       const hasEconN=Object.keys(econBonus).length>0;
-      // клітинка каси: прогноз + (за наявності) дрібна економіка під ним
       // emptyState: 'cross' = взагалі не ставив (✕), 'dash' = ставив, але пара не зійшлась (—)
+      // Для 'dash' гравець все одно в касі (zero) — показуємо його програшну економіку під прочерком.
       function poolCell(pr, e, emptyState){
         if(!pr){
-          if(emptyState==='dash')return '<span style="color:var(--muted);font-size:18px" title="Зробив прогноз, але не вгадав пару — у касу не входить">—</span>';
+          if(emptyState==='dash'){
+            let d='<span style="color:var(--muted);font-size:18px" title="Зробив прогноз, але не вгадав пару — у цьому матчі набирає 0, але бере участь у касі">—</span>';
+            if(e){
+              const nowTxt=(hasRes&&e.now!==null)?('<span style="color:'+(e.now>0?'var(--green2)':e.now<0?'#ff6b6b':'var(--muted)')+'">● '+fmtE(e.now)+'</span> ') : '';
+              d+='<div style="font-size:9px;color:var(--muted);line-height:1.5;margin-top:1px">'+nowTxt
+                +'<span style="color:var(--green2)">▲'+fmtE(e.best)+'</span> '
+                +'<span style="color:#ff6b6b">▼'+fmtE(e.worst)+'</span></div>';
+            }
+            return d;
+          }
           return '<span style="color:#ff6b6b;font-size:16px;font-weight:700" title="Не робив прогноз у цій касі">✕</span>';
         }
         const m=markFor(pr);
@@ -6409,14 +6443,16 @@ function renderLive(){
         return s;
       }
       // блок деталей однієї каси всередині accordion: при якому рахунку макс/мін
-      function poolDetail(label, pr, e){
-        if(!pr||!e)return '';
-        let d='<div style="margin-top:.4rem"><div style="font-weight:700;color:var(--gold);font-size:12px;margin-bottom:2px">'+label+' ('+pr.h+':'+pr.a+')</div>';
+      function poolDetail(label, pr, e, zeroInfo){
+        if(!e)return '';
+        const hdr=pr?('('+pr.h+':'+pr.a+')'):(zeroInfo?'(пара не вгадана — 0 за матч)':'');
+        let d='<div style="margin-top:.4rem"><div style="font-weight:700;color:var(--gold);font-size:12px;margin-bottom:2px">'+label+' '+hdr+'</div>';
         if(hasRes&&e.now!==null){
           const ncol=e.now>0?'var(--green2)':e.now<0?'#ff6b6b':'var(--muted)';
           d+='<div><span style="font-weight:700;color:'+ncol+'">● Зараз ('+res.h+':'+res.a+'):</span> '+fmtE(e.now)+'</div>';
         }
-        d+='<div><span class="le-best" style="font-weight:700">▲ Найкраще:</span> '+fmtE(e.best)+' <span class="le-tag">(якщо вгадає точний рахунок '+pr.h+':'+pr.a+')</span></div>';
+        const bestTag=pr?('(якщо вгадає точний рахунок '+pr.h+':'+pr.a+')'):('(найкращий для нього розклад '+(e.bestScore?e.bestScore.h+':'+e.bestScore.a:'—')+')');
+        d+='<div><span class="le-best" style="font-weight:700">▲ Найкраще:</span> '+fmtE(e.best)+' <span class="le-tag">'+bestTag+'</span></div>';
         d+='<div><span class="le-worst" style="font-weight:700">▼ Найгірше:</span> '+fmtE(e.worst)+' <span class="le-tag">(якщо буде '+e.worstScore.h+':'+e.worstScore.a+')</span></div>';
         d+='</div>';
         return d;
@@ -6428,7 +6464,8 @@ function renderLive(){
         // До турніру: ставив, але пара мимо → прочерк; не ставив → хрестик
         const baseEmpty=r.baseStaked?'dash':'cross';
         const eB=econBase[r.n], eN=econBonus[r.n];
-        const hasDetail=(r.base&&eB)||(r.bonus&&eN);
+        // accordion є, якщо у будь-якій касі є економіка (вкл. zero-гравців із прочерком)
+        const hasDetail=!!eB||!!eN;
         html+='<div class="le-row" onclick="this.querySelector(\'.le-detail2\')&&this.querySelector(\'.le-detail2\').classList.toggle(\'open\')" style="'+(hasDetail?'cursor:pointer':'')+'">';
         html+='<div style="display:grid;grid-template-columns:1fr 110px 110px;gap:0;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
         html+='<span style="font-size:14px;font-weight:600">'+escapeHtml(r.n)+(hasDetail?' <span style="color:var(--muted);font-size:11px">▾</span>':'')+'</span>';
@@ -6437,8 +6474,8 @@ function renderLive(){
         html+='</div>';
         if(hasDetail){
           html+='<div class="le-detail2" style="padding:.5rem 1rem .7rem;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;line-height:1.6">';
-          html+=poolDetail('📅 До турніру', r.base, eB);
-          html+=poolDetail('🎯 Бонус', r.bonus, eN);
+          html+=poolDetail('📅 До турніру', r.base, eB, r.baseRaw&&!r.base);
+          html+=poolDetail('🎯 Бонус', r.bonus, eN, false);
           html+='</div>';
         }
         html+='</div>';
@@ -6447,7 +6484,7 @@ function renderLive(){
       // ── Командні очки «До турніру» — тільки якщо ≥1 учасник вгадав пару (плейофф) ──
       const teamLine=liveTeamPointsLine(mid, info, rows, code);
       if(teamLine) html+=teamLine;
-      const baseCnt=rows.filter(r=>r.base).length, bonusCnt=rows.filter(r=>r.bonus).length;
+      const baseCnt=baseList.length, bonusCnt=bonusList.length;
       let legend='📅 '+baseCnt+' · 🎯 '+bonusCnt;
       if(hasEconB||hasEconN) legend+=' · ▲/▼ — потенціал у '+code+' (zero-sum у межах каси) · ● зараз';
       if(hasRes) legend+=' · ✓ точний · ≈ різниця · ~ напрямок · ✗ мимо';

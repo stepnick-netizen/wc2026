@@ -5813,6 +5813,28 @@ function renderSummaryTable(){
       +'</tr>';
   }).join('');
 
+  // ── Банк кожної каси = сума додатних балансів у цій касі (zero-sum: =|від'ємних|) ──
+  const bank=arr=>arr.reduce((s,v)=>s+(v>0?v:0),0);
+  const bankGroup=bank(rows.map(r=>r.bd.group));
+  const bankPlay=bank(rows.map(r=>r.bd.playoff));
+  const bankNoms=bank(rows.map(r=>r.bd.noms));
+  const bankBonus=bank(rows.map(r=>r.bd.bonus));
+  const bankTotal=bankGroup+bankPlay+bankNoms+bankBonus;
+  function cashRow(label,val,strong){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;'
+      +'padding:.55rem .9rem;'+(strong?'border-top:2px solid var(--border);margin-top:.25rem':'border-top:1px solid var(--border)')+'">'
+      +'<span style="font-size:13px;'+(strong?'font-weight:700;color:var(--text)':'color:var(--muted)')+'">'+label+'</span>'
+      +'<span style="font-family:\'Bebas Neue\';font-size:'+(strong?'26px':'20px')+';color:var(--gold)">'+val+' '+code+'</span></div>';
+  }
+  let cashPanel='<div style="margin:.5rem 0 1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+    +'<div style="padding:.6rem .9rem;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:var(--bg3)">💰 Каса по етапах</div>'
+    +cashRow('🥅 Групи',bankGroup,false)
+    +cashRow('🏟️ Плей-оф',bankPlay,false)
+    +cashRow('🏅 Номінації',bankNoms,false)
+    +(bonusActive?cashRow('🎯 Бонус',bankBonus,false):'')
+    +cashRow('РАЗОМ',bankTotal,true)
+    +'</div>';
+
   host.innerHTML='<div style="margin:.5rem 0 1rem">'
     +'<p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Зведення по всіх касах. Кожна каса — окремий zero-sum пул. «—» — гравець не бере участі в цій касі. Формат: <b style="color:var(--text)">очки / гроші</b>.</p>'
     +'<div class="scen-wrap"><table class="lb-table"><thead><tr>'
@@ -5822,7 +5844,8 @@ function renderSummaryTable(){
     +'<th class="r">🏅 Номінації<br><span style="font-weight:400;color:var(--muted);font-size:10px">очки / грн</span></th>'
     +bonusCol
     +'<th class="r">Σ Очки</th><th class="r">Σ Баланс</th>'
-    +'</tr></thead><tbody>'+body+'</tbody></table></div></div>';
+    +'</tr></thead><tbody>'+body+'</tbody></table></div>'
+    +cashPanel+'</div>';
 }
 
 function renderLeaderboard(){

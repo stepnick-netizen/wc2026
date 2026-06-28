@@ -1332,7 +1332,19 @@ function calcDetailedPts(name){
       const slots=getPredSlotsForRound(round.id,pred);
       pTeams=slots.map(s=>[s.home,s.away]).flat().filter(t=>t&&t!=='TBD'&&!t.startsWith('Переможець'));
     }catch(e){pTeams=(pred.playoffs||{})[round.id]||[];}
-    const rTeams=(S.playoffTeams||{})[round.id]||[];
+    // r32: реальний склад 1/16 деривується з груп + «Розстановки третіх місць»,
+    // тож бали за вихід команд у 1/16 оживають одразу після завершення груп
+    // (для тих, хто в касі плей-оф — гейт inPlayoffPool вище). Фолбек на
+    // S.playoffTeams.r32, якщо реальні слоти ще не визначені.
+    let rTeams=(S.playoffTeams||{})[round.id]||[];
+    if(round.id==='r32'){
+      try{
+        const realR32=getRealR32Slots()
+          .map(s=>[s.home,s.away]).flat()
+          .filter(t=>t&&t!=='TBD'&&!String(t).startsWith('Переможець')&&!String(t).startsWith('Матч'));
+        if(realR32.length)rTeams=realR32;
+      }catch(e){}
+    }
     pTeams.forEach(t=>{
       if(rTeams.includes(t)){
         if(round.id==='r32')r32+=s.r32;

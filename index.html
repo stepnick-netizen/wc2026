@@ -1421,7 +1421,7 @@ function calcDetailedPts(name){
   (S.nominations||[]).forEach(n=>{if(n.winner&&(pred.nominations||{})[n.id]===n.winner)nomPts+=n.pts;});
 
   // Bonus round — separate, full playoff 1/16→final+champ+noms
-  let bonusPts=0,bExact=0,bResult=0,bScorePts=0,bR32=0,bR16=0,bR8=0,bR4=0,bFin=0,bChamp=0,bNom=0;
+  let bonusPts=0,bExact=0,bResult=0,bDiff=0,bScorePts=0,bR32=0,bR16=0,bR8=0,bR4=0,bFin=0,bChamp=0,bNom=0;
   if(S.bonusRound?.active){
     const br=S.bonusRound,bpred=br.predictions[name]||{},bpm=bpred.matches||{};
     // Match scores for bonus rounds (1/8 onward) — compare vs real bracket results
@@ -1437,9 +1437,11 @@ function calcDetailedPts(name){
         const res=S.matches[realMid]||(br.results||{})[mid];
         if(!res||res.h===''||res.h===undefined)continue;
         const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,{exact:br.ptsScore,result:br.ptsResult,diff:br.ptsDiff||0});
-        bonusPts+=sc.exact+sc.result+sc.diff;
-        bScorePts+=sc.exact+sc.result+sc.diff;
-        if(sc.exact)bExact++; else if(sc.result)bResult++;
+        // Взаємовиключно: рахунок АБО різниця АБО результат (макс. одна категорія)
+        const onePts = sc.exact ? sc.exact : (sc.diff ? sc.diff : sc.result);
+        bonusPts+=onePts;
+        bScorePts+=onePts;
+        if(sc.exact)bExact++; else if(sc.diff)bDiff++; else if(sc.result)bResult++;
       }
       // ── КОМАНДНІ бали (прохід команди): стартують з 1/8 (r16). Для 1/16 їх немає ──
       if(round.id==='r32'){return;}
@@ -1505,7 +1507,7 @@ function calcDetailedPts(name){
   return{matchPts,matchPtsGroup,matchPtsPlayoff,groupPts,r32,r16,r8,r4,fin,champ,nomPts,total,bonusPts,
     poolGroup,poolPlayoff,poolNoms,
     detail:{exactCount,resultCount,diffCount,groupPtsCount,goalDiffCount,placeCount},
-    bonusDetail:{bExact,bResult,bScorePts,bR32,bR16,bR8,bR4,bFin,bChamp,bNom}};
+    bonusDetail:{bExact,bResult,bDiff,bScorePts,bR32,bR16,bR8,bR4,bFin,bChamp,bNom}};
 }
 
 function calcPts(name){return calcDetailedPts(name);}
@@ -4941,7 +4943,7 @@ function renderAllPredsBody(){
                 const pH=(predHomeB===realHome)?+p.h:+p.a;
                 const pA=(predHomeB===realHome)?+p.a:+p.h;
                 const sc=scoreMatch(rH,rA,pH,pA,{exact:br.ptsScore||3,result:br.ptsResult||1,diff:br.ptsDiff||0});
-                bMatchPts+=sc.exact+sc.result;
+                bMatchPts+=sc.exact?sc.exact:(sc.diff?sc.diff:sc.result);
                 if(pH===rH&&pA===rA){col='var(--green2)';label='✓';}
                 else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#ff9500';label='≈';}
                 else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='#5b9fd4';label='~';}
@@ -4989,7 +4991,7 @@ function renderAllPredsBody(){
                 const p2H=(predHome2===rH2)?+p2.h:+p2.a;
                 const p2A=(predHome2===rH2)?+p2.a:+p2.h;
                 const sc2=scoreMatch(+res.h,+res.a,p2H,p2A,{exact:br.ptsScore||3,result:br.ptsResult||1,diff:br.ptsDiff||0});
-                their+=sc2.exact+sc2.result;
+                their+=sc2.exact?sc2.exact:(sc2.diff?sc2.diff:sc2.result);
               }
               bRSBal+=(bMatchPts-their);
             });
@@ -5291,6 +5293,7 @@ function renderStatsContent(){
       <div class="card-title">Бонусний раунд</div>
       ${cardHead()}
       ${row3('Точних рахунків',bd.bExact,bd.bExact*(br.ptsScore||3),'var(--green2)')}
+      ${row3('Вгаданих різниць',bd.bDiff||0,(bd.bDiff||0)*(br.ptsDiff||2),'var(--gold)')}
       ${row3('Правильних результатів',bd.bResult,bd.bResult*(br.ptsResult||1),'#5b9fd4')}
       ${row3('1/8 фіналу',bd.bR16,bd.bR16,'var(--blue3)')}
       ${row3('1/4 фіналу',bd.bR8,bd.bR8,'var(--blue3)')}
@@ -6221,6 +6224,8 @@ function liveMatchEconomics(preds, rate, currentR, scoring){
     // бали гравця k за рахунку R; для zero-гравця завжди 0
     if(preds[k].zero)return 0;
     const sc=scoreMatch(R.h,R.a,preds[k].h,preds[k].a,sco);
+    // excl=true → бонусний режим: рахунок АБО різниця АБО результат (макс. одна)
+    if(sco.excl)return sc.exact?sc.exact:(sc.diff?sc.diff:sc.result);
     return sc.exact+sc.result+sc.diff;
   }
   function balFor(meIdx, R){
@@ -6415,7 +6420,7 @@ function renderLive(){
       const baseList=rows.filter(r=>r.baseRaw).map(r=>({n:r.n,h:r.baseRaw.h,a:r.baseRaw.a,zero:!r.base}));
       const bonusList=rows.filter(r=>r.bonus).map(r=>({n:r.n,h:r.bonus.h,a:r.bonus.a}));
       const br=S.bonusRound||{};
-      const bonusSco={exact:br.ptsScore||3, result:br.ptsResult||1, diff:br.ptsDiff||0};
+      const bonusSco={exact:br.ptsScore||3, result:br.ptsResult||1, diff:br.ptsDiff||0, excl:true};
       const econBase=liveMatchEconomics(baseList, rate, nowR, S.scoring);
       const econBonus=liveMatchEconomics(bonusList, br.rate||rate, nowR, bonusSco);
       const hasEconB=Object.keys(econBase).length>0;

@@ -939,26 +939,13 @@ select:focus,input:focus{outline:none;border-color:var(--gold);}
 <div id="page-leaderboard" class="page">
   <div class="sec-title" data-i18n="nav_lb">Таблиця лідерів</div>
   <div id="lb-summary-section"></div>
-  <div class="sec-title" style="font-size:18px;margin-top:2rem">📋 Деталізація по раундах</div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Очки за кожен раунд. «—» — гравець не бере участі в цій касі.</p>
-  <div class="scen-wrap"><table class="lb-table">
-    <thead><tr>
-      <th>#</th><th data-i18n="participant">Учасник</th>
-      <th class="r" data-i18n="col_scores">Рахунки</th>
-      <th class="r" data-i18n="col_groups">Групи</th>
-      <th class="r">1/16</th><th class="r">1/8</th>
-      <th class="r">1/4</th><th class="r">1/2</th>
-      <th class="r" data-i18n="col_final">Фінал</th>
-      <th class="r" data-i18n="col_champ">Чемп.</th>
-      <th class="r" data-i18n="col_noms">Номін.</th>
-      <th class="r" data-i18n="col_total">Очки</th>
-      <th class="r pool-col" title="Частка зіграних матчів з прогнозом, де вгадано бодай щось">Влучність</th>
-    </tr></thead>
-    <tbody id="lb-body"></tbody>
-  </table></div>
-  <div id="lb-cash-total"></div>
-  <div id="lb-pools-section"></div>
+
+  <!-- Pt3: Основний етап (групи+плей-оф) — лише ті, хто заповнив усе з початку -->
+  <div id="lb-mainstage-section"></div>
+
+  <!-- Pt4 порядок: Рейтинг → Основний етап → Бонусний → Груповий → решта -->
   <div id="lb-bonus-section"></div>
+  <div id="lb-pools-section"></div>
   <div id="lb-combined-section"></div>
   <div id="lb-scenario-section"></div>
 </div>
@@ -1046,6 +1033,16 @@ function escapeAttr(s){
 function flag(iso,size='16x12'){
   if(!iso)return '';
   return `<img src="https://flagcdn.com/${size}/${iso.toLowerCase()}.png" width="${size.split('x')[0]}" height="${size.split('x')[1]}" alt="${iso}" style="border-radius:1px;vertical-align:middle;margin-right:4px">`;
+}
+// Пошук iso (для прапора) за назвою команди — з усіх груп. Кеш на перший виклик.
+let _teamIsoCache=null;
+function teamIso(name){
+  if(!name)return '';
+  if(!_teamIsoCache){
+    _teamIsoCache={};
+    try{Object.values(GROUPS||{}).forEach(gd=>(gd.teams||[]).forEach(t=>{if(t&&t.n)_teamIsoCache[t.n]=t.iso||'';}));}catch(e){}
+  }
+  return _teamIsoCache[name]||'';
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1867,21 +1864,41 @@ function renderHome(){
   document.getElementById('hs-players').textContent=S.participants.length;
   initQuoteRotation();
   document.getElementById('hs-played').textContent=Object.values(S.matches).filter(m=>m.h!==''&&m.h!==undefined).length;
-  const sorted=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
-  document.getElementById('home-top3').innerHTML=sorted.slice(0,3).map((p,i)=>`
+  // Pt7: ТОП-3 за ГРОШИМА (зведений баланс по всіх касах), не за очками.
+  const curr=S.currency||{code:'UAH',rate:1};
+  const byMoney=S.participants.map(n=>({n, bal:calcPoolBalanceBreakdown(n).total, total:calcPts(n).total}))
+    .sort((a,b)=>b.bal-a.bal||b.total-a.total);
+  document.getElementById('home-top3').innerHTML=byMoney.slice(0,3).map((p,i)=>`
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:18px">${['🥇','🥈','🥉'][i]}</span>
-      <span style="font-weight:700;flex:1">${p.n}</span>
-      <span style="font-family:'Bebas Neue';font-size:22px;color:var(--gold)">${p.total}</span>
+      <span style="font-weight:700;flex:1">${escapeHtml(p.n)}</span>
+      <span style="font-family:'Bebas Neue';font-size:22px;color:${p.bal>=0?'var(--green2)':'#ff6b6b'}">${p.bal>=0?'+':''}${p.bal} ${curr.code}</span>
     </div>`).join('');
-  // «Останні результати»: лише групові матчі з введеним рахунком, відсортовані
-  // за часом введення (ts) спадно. Матчі без ts (введені до цього оновлення)
-  // отримують ts=0 і опускаються в кінець, тож свіжі завжди зверху.
-  const recentAll=allGroupMatches().filter(m=>S.matches[m.id]?.h!==undefined&&S.matches[m.id]?.h!=='');
-  const recent=recentAll.slice().sort((a,b)=>((S.matches[b.id]?.ts||0)-(S.matches[a.id]?.ts||0))).slice(0,4);
-  document.getElementById('home-recent').innerHTML=recent.length?recent.map(m=>{
+  // Pt6: «Останні результати» — групові + плей-оф матчі з введеним рахунком,
+  // відсортовані за часом введення (ts) спадно. Беремо 4 найсвіжіші будь-якої стадії.
+  const isRealName=t=>t&&!String(t).startsWith('Пер.')&&!String(t).startsWith('Переможець')&&!String(t).startsWith('Матч')&&!String(t).startsWith('TBD')&&t!=='—'&&t!=='?';
+  const recentItems=[];
+  // Групові
+  allGroupMatches().forEach(m=>{
     const r=S.matches[m.id];
-    return`<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="flex:1">${flag(m.home.iso)}${m.home.n}</span><span style="font-family:'Bebas Neue';font-size:17px;color:var(--gold)">${r.h}:${r.a}</span><span style="flex:1;text-align:right">${flag(m.away.iso)}${m.away.n}</span></div>`;
+    if(!r||r.h===undefined||r.h==='')return;
+    recentItems.push({ts:r.ts||0, hN:m.home.n, hI:m.home.iso, aN:m.away.n, aI:m.away.iso, h:r.h, a:r.a});
+  });
+  // Плей-оф (команди з playoffSlots)
+  PLAYOFF_ROUNDS.forEach(round=>{
+    for(let i=0;i<round.n;i++){
+      const mid=`${round.id}_${i}`;
+      const r=S.matches[mid];
+      if(!r||r.h===undefined||r.h==='')continue;
+      const slot=(S.playoffSlots||{})[mid]||{};
+      if(!isRealName(slot.home)||!isRealName(slot.away))continue;
+      recentItems.push({ts:r.ts||0, hN:slot.home, hI:teamIso(slot.home), aN:slot.away, aI:teamIso(slot.away), h:r.h, a:r.a, tag:round.label});
+    }
+  });
+  const recent=recentItems.sort((a,b)=>b.ts-a.ts).slice(0,4);
+  document.getElementById('home-recent').innerHTML=recent.length?recent.map(it=>{
+    const tagHtml=it.tag?`<span style="font-size:9px;color:var(--blue3);background:rgba(100,149,237,.1);border-radius:4px;padding:1px 5px;margin-left:5px">${it.tag}</span>`:'';
+    return`<div style="display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="flex:1">${flag(it.hI)}${escapeHtml(it.hN)}</span><span style="font-family:'Bebas Neue';font-size:17px;color:var(--gold)">${it.h}:${it.a}</span><span style="flex:1;text-align:right">${escapeHtml(it.aN)}${flag(it.aI)}${tagHtml}</span></div>`;
   }).join(''):`<p style="color:var(--muted);font-size:12px;padding:1rem 0">Матчі ще не розпочались</p>`;
 }
 
@@ -4142,7 +4159,10 @@ function renderAllPredsBody(){
   const curr=S.currency||{code:'UAH',rate:1};
   const sorted=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
   const rank=sorted.findIndex(x=>x.n===name)+1;
-  const balance=calcBalance(name, sorted, curr.rate);
+  const _bd=calcPoolBalanceBreakdown(name);
+  // Баланс ШАПКИ = основні каси (групи+плей-оф+номінації), без бонусу.
+  // Бонус показуємо окремим рядком нижче. Сума = той самий total, що в Рейтингу.
+  const balance=_bd.group+_bd.playoff+_bd.noms;
   const d2=pts.detail||{};
   const groupStagePts=(pts.matchPts||0)+(pts.groupPts||0);
   const playoffPts=(pts.r32||0)+(pts.r16||0)+(pts.r8||0)+(pts.r4||0)+(pts.fin||0)+(pts.champ||0);
@@ -4151,7 +4171,7 @@ function renderAllPredsBody(){
   const bonusActive=br&&br.active;
   const isBonusParticipant=bonusActive&&Object.keys((br.predictions[name]||{}).matches||{}).length>0;
   const bonusParticipants=bonusActive?getBonusParticipants():[];
-  const bonusBal=isBonusParticipant?calcBonusBalance(name,bonusParticipants):null;
+  const bonusBal=isBonusParticipant?_bd.bonus:null;
   const bCode=curr.code;
 
   const statCol=(label,value,color)=>`<div>
@@ -4533,7 +4553,17 @@ function renderAllPredsBody(){
 
   PLAYOFF_ROUNDS.forEach(round=>{
     const picked=getPickedTeams(round.id);
-    const real=(S.playoffTeams||{})[round.id]||[];
+    // Реальний склад раунду — з ТОГО Ж джерела, що й скоринг (getRealSlotsForRound),
+    // а не з S.playoffTeams (яке оживає лише після вводу рахунку матчу). Так підсвічування
+    // збігається з нарахуванням очок: команда зелена щойно вона реально потрапила в раунд.
+    const _realName=t=>t&&!String(t).startsWith('Пер.')&&!String(t).startsWith('Переможець')&&!String(t).startsWith('Матч')&&!String(t).startsWith('TBD')&&t!=='—';
+    let real=[];
+    try{
+      real=getRealSlotsForRound(round.id).map(s=>[s.home,s.away]).flat().filter(_realName);
+    }catch(e){real=(S.playoffTeams||{})[round.id]||[];}
+    // roundKnown: чи склад цього раунду вже визначений (є хоч одна реальна команда).
+    // Якщо ні — не позначаємо команди як «не вгадані» (✗), показуємо нейтрально (○).
+    const roundKnown=real.length>0;
     // Per-round pts
     const roundPtsKey={r32:'r32',r16:'r16',r8:'r8',r4:'r4',final:'fin'}[round.id];
     const roundPts=roundPtsKey?(pts[roundPtsKey]||0)+(round.id==='final'?(pts.champ||0):0):0;
@@ -4548,7 +4578,7 @@ function renderAllPredsBody(){
     const rBalCol=roundMoney>0?'var(--green2)':roundMoney<0?'#ff6b6b':'var(--muted)';
     const rPtsCol=roundPts>0?'var(--gold)':'var(--muted)';
     html+=`<div class="card-sm"><div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin-bottom:8px">${round.label.toUpperCase()}</div>`;
-    html+=picked.length?picked.map(t=>{const ok=real.length>0&&real.includes(t),bad=real.length>0&&!real.includes(t);return`<div style="font-size:12px;padding:2px 0;color:${ok?'var(--green2)':bad?'#ff6b6b':'var(--text)'}">${ok?'✓':bad?'✗':'○'} ${t}</div>`;}).join(''):'<div style="font-size:12px;color:var(--muted)">—</div>';
+    html+=picked.length?picked.map(t=>{const ok=real.includes(t),bad=roundKnown&&!real.includes(t);return`<div style="font-size:12px;padding:2px 0;color:${ok?'var(--green2)':bad?'#ff6b6b':'var(--text)'}">${ok?'✓':bad?'✗':'○'} ${t}</div>`;}).join(''):'<div style="font-size:12px;color:var(--muted)">—</div>';
     if(round.id==='final'){
       const cp=(pred.playoffs||{}).champion||'';
       // Деривуємо справжнього чемпіона з результату фіналу — той самий підхід, що в scoring
@@ -4790,10 +4820,39 @@ function renderAllPredsBody(){
         else realChampion=realFinalMatch.winner||'';
       }
 
-      const bonusRounds=PLAYOFF_ROUNDS.filter(r=>r.id!=='r32');
+      // Pt9: показуємо і 1/16 (r32) — там гравець ставить рахунки, переможець матчу
+      // проходить далі. Список команд = переможці за прогнозом гравця; зелена — якщо
+      // ця команда реально пройшла з 1/16 (збіг із реальним переможцем матчу).
+      const _bonusR32Picked=()=>{
+        const slots=getRealR32Slots();
+        const out=[];
+        slots.forEach((s,i)=>{
+          const p=bpm[`b_r32_${i}`];
+          if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
+          if(+p.h>+p.a)out.push(s.home);
+          else if(+p.a>+p.h)out.push(s.away);
+          else if(p.winner)out.push(p.winner);
+        });
+        return out;
+      };
+      const _bonusR32Real=()=>{
+        const slots=getRealR32Slots();
+        const out=[];
+        slots.forEach((s,i)=>{
+          const res=S.matches[`r32_${i}`];
+          if(!res||res.h===''||res.h===undefined)return;
+          if(+res.h>+res.a)out.push(s.home);
+          else if(+res.a>+res.h)out.push(s.away);
+          else if(res.winner)out.push(res.winner);
+        });
+        return out;
+      };
+
+      const bonusRounds=PLAYOFF_ROUNDS;
       bonusRounds.forEach(round=>{
-        const pTeams=(bPlayoffs[round.id]||[]);
-        const rTeams=round.id==='third'?[]:getRealAdvancedForBonus(round.id);
+        const isR32=round.id==='r32';
+        const pTeams=isR32?_bonusR32Picked():(bPlayoffs[round.id]||[]);
+        const rTeams=round.id==='third'?[]:(isR32?_bonusR32Real():getRealAdvancedForBonus(round.id));
         const roundDone=rTeams.length>0||(round.id==='final'&&realChampion);
         // Per-round bonus team pts
         const bDetail=pts.bonusDetail;
@@ -4836,7 +4895,11 @@ function renderAllPredsBody(){
             const cpBad=cp&&realChampion&&cp!==realChampion;
             html+=`<div style="font-size:11px;color:${cpOk?'var(--green2)':cpBad?'#ff6b6b':'var(--muted)'};margin-top:6px">🏆 ${cpOk?'✓':cpBad?'✗':'○'} ${cp||'—'}</div>`;
           }
-          if(roundDone&&(bRoundPts>0||rTeams.length>0)){
+          if(isR32){
+            // У бонусі за вихід команд з 1/16 окремих балів немає — лише за рахунки матчів
+            // (див. блок «РАХУНКИ МАТЧІВ» нижче). Показуємо підказку, а не «0 оч.».
+            html+=`<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--border);font-size:10px;color:var(--muted);line-height:1.4">Бали за 1/16 — лише за рахунки матчів (нижче). Зелена команда = вгадав, хто пройшов далі.</div>`;
+          } else if(roundDone&&(bRoundPts>0||rTeams.length>0)){
             html+=`<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px">
               <b style="color:${bRPtsCol}">${bRoundPts} оч.</b>
               ${bonusParticipantsR.length>1?`<span style="color:var(--muted)">·</span><b style="color:${bRBalCol}">${bRoundMoney>=0?'+':''}${bRoundMoney} ${bCurrR.code}</b>`:''}
@@ -5203,10 +5266,12 @@ function renderStatsContent(){
   const br=S.bonusRound;
   const sorted=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
   const rank=sorted.findIndex(x=>x.n===name)+1;
-  const bal=calcBalance(name, sorted, curr.rate);
+  const bal_bd=calcPoolBalanceBreakdown(name);
+  // Основні каси (групи+плей-оф+номінації) — без бонусу, як у Рейтингу.
+  const bal=bal_bd.group+bal_bd.playoff+bal_bd.noms;
   const bonusParticipants=getBonusParticipants();
-  const bonusBal=bonusParticipants.includes(name)?calcBonusBalance(name,bonusParticipants):0;
-  const totalBal=bal+bonusBal;
+  const bonusBal=bal_bd.bonus;
+  const totalBal=bal_bd.total;
   const s=S.scoring;
 
   // 3-column row: label / count+pts / UAH
@@ -5746,7 +5811,61 @@ function calcBalance(nameOrPts, allData, rate){
   }
   return 0;
 }
-// ── Рендер секції «Каси» (4 окремі zero-sum пули) ──────────────────
+// ── Pt3: Таблиця «Основний етап» (групи + плей-оф) ─────────────────
+// Лише учасники, що заповнили І групу, І плей-оф (inGroupPool && inPlayoffPool) —
+// тобто прогнозували від початку турніру до кінця. Баланс = група+плей-оф каси
+// (ті самі числа, що у зведеній таблиці Рейтингу). Підсумок — проста сума
+// показаних балансів; рівно 0 може не бути, бо групова каса ширша за цю таблицю
+// (у ній є й суто-групові гравці, яких тут нема).
+function renderMainStageTable(){
+  const host=document.getElementById('lb-mainstage-section');
+  if(!host)return;
+  const curr=S.currency||{code:'UAH',rate:1};
+  const code=curr.code||'UAH';
+  const members=(S.participants||[]).filter(n=>{try{return inGroupPool(n)&&inPlayoffPool(n);}catch(e){return false;}});
+  if(members.length===0){host.innerHTML='';return;}
+  // Очки основного етапу (без номінацій, без бонусу) = рахунки+групи+усі плей-оф раунди+чемпіон
+  const mainPts=p=>(p.matchPts||0)+(p.groupPts||0)+(p.r32||0)+(p.r16||0)+(p.r8||0)+(p.r4||0)+(p.fin||0)+(p.champ||0);
+  const rows=members.map(n=>{const d=calcPts(n);const bd=calcPoolBalanceBreakdown(n);
+    return {n, p:d, pts:mainPts(d), bal:(bd.group||0)+(bd.playoff||0)};})
+    .sort((a,b)=>b.pts-a.pts);
+  let sumBal=0;
+  const body=rows.map((row,i)=>{
+    const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
+    const p=row.p;sumBal+=row.bal;
+    const balEl=row.bal>=0?`<td class="uah-pos">+${row.bal} ${code}</td>`:`<td class="uah-neg">${row.bal} ${code}</td>`;
+    return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
+      <td class="sub-cell">${p.matchPts||0}</td><td class="sub-cell">${p.groupPts||0}</td>
+      <td class="sub-cell">${p.r32||0}</td><td class="sub-cell">${p.r16||0}</td>
+      <td class="sub-cell">${p.r8||0}</td><td class="sub-cell">${p.r4||0}</td>
+      <td class="sub-cell">${p.fin||0}</td><td class="sub-cell">${p.champ||0}</td>
+      <td class="pts-cell">${row.pts}</td>${balEl}</tr>`;
+  }).join('');
+  const sumCol=sumBal>=0?`<td class="uah-pos">+${sumBal} ${code}</td>`:`<td class="uah-neg">${sumBal} ${code}</td>`;
+  host.innerHTML=`<div style="margin-top:2rem">
+    <div class="sec-title" style="font-size:18px">🎯 Основний етап <span style="font-size:13px;color:var(--muted);font-weight:400">(групи + плей-оф)</span></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Учасники, що заповнили прогнози з початку турніру й до кінця (групи + повний плей-оф). ${members.length} уч.</p>
+    <div class="scen-wrap"><table class="lb-table">
+      <thead><tr>
+        <th>#</th><th>Учасник</th>
+        <th class="r">Рахунки</th><th class="r">Групи</th>
+        <th class="r">1/16</th><th class="r">1/8</th>
+        <th class="r">1/4</th><th class="r">1/2</th>
+        <th class="r">Фінал</th><th class="r">Чемп.</th>
+        <th class="r">Очки</th><th class="r">Баланс</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700">
+        <td></td><td class="name-cell">Банк етапу</td>
+        <td class="sub-cell" colspan="8" style="color:var(--muted);text-align:right;font-weight:400;font-size:11px">сума балансів показаних учасників →</td>
+        <td class="pts-cell"></td>${sumCol}
+      </tr></tfoot>
+    </table></div>
+    <p style="font-size:11px;color:var(--muted);margin-top:.5rem;line-height:1.5">Банк плей-оф каси завжди сходиться в 0. Групова складова може давати залишок, бо повна групова каса ширша за цю таблицю (включає тих, хто заповнив лише групи) — див. касу «Груповий етап» нижче.</p>
+  </div>`;
+}
+
+// ── Рендер секції «Каси» (zero-sum пули) ──────────────────────────
 // Кожна каса: свої учасники, свій zero-sum баланс. Порожні не показуємо.
 function renderPoolTables(){
   const host=document.getElementById('lb-pools-section');
@@ -5754,11 +5873,15 @@ function renderPoolTables(){
   const curr=S.currency||{code:'UAH',rate:1};
   const rate=curr.rate||1, code=curr.code||'UAH';
 
-  function poolTable(title, hint, members, ptsField, breakdown){
+  function poolTable(title, hint, members, ptsField, mode){
     if(!members||members.length===0)return '';
+    const breakdown=(mode===true||mode==='group'); // зворотна сумісність: true == групова розбивка
+    const poMode=(mode==='playoff');
+    const nomMode=(mode==='noms');
+    const nomsList=(S.nominations||[]);
     const balMap=calcPoolBalances(members, ptsField, rate); // один раз на касу
     const s=S.scoring;
-    const rows=members.map(n=>{const d=calcPts(n); return {n, pts:d[ptsField]||0, det:d.detail||{}};})
+    const rows=members.map(n=>{const d=calcPts(n); return {n, pts:d[ptsField]||0, det:d.detail||{}, full:d, noms:(S.predictions[n]||{}).nominations||{}};})
                       .sort((a,b)=>b.pts-a.pts);
     const maxPts=rows[0]?.pts||1;
     const body=rows.map((row,i)=>{
@@ -5766,7 +5889,17 @@ function renderPoolTables(){
       const bal=balMap.get(row.n)||0;
       const balEl=bal>=0?`<td class="uah-pos">+${bal} ${code}</td>`:`<td class="uah-neg">${bal} ${code}</td>`;
       let bd='';
-      if(breakdown){
+      if(poMode){
+        const f=row.full;
+        function pc(v){return v>0?`<td class="sub-cell">${v}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;}
+        bd=pc(f.r32||0)+pc(f.r16||0)+pc(f.r8||0)+pc(f.r4||0)+pc(f.fin||0)+pc(f.champ||0);
+      } else if(nomMode){
+        // Колонка на кожну номінацію: очки, якщо вгадано переможця (інакше ·).
+        bd=nomsList.map(nm=>{
+          const guessed=nm.winner&&row.noms[nm.id]===nm.winner;
+          return guessed?`<td class="sub-cell" style="color:var(--green2)">${nm.pts}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;
+        }).join('');
+      } else if(breakdown){
         const d=row.det;
         // У колонках — КІЛЬКІСТЬ вгаданого (не очки). Очки — у підсумковій колонці.
         function bc(cnt){return cnt>0?`<td class="sub-cell">${cnt}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;}
@@ -5781,7 +5914,16 @@ function renderPoolTables(){
         ${accCell}</tr>`;
     }).join('');
     let bhead='';
-    if(breakdown){
+    if(nomMode){
+      bhead=nomsList.map(nm=>`<th class="r" title="${escapeAttr(nm.name)} (${nm.pts} оч.)${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}</th>`).join('');
+    } else if(poMode){
+      bhead='<th class="r" title="Очки за вихід команд у 1/16">1/16</th>'
+        +'<th class="r" title="Очки за вихід команд у 1/8">1/8</th>'
+        +'<th class="r" title="Очки за вихід команд у 1/4">1/4</th>'
+        +'<th class="r" title="Очки за вихід команд у 1/2">1/2</th>'
+        +'<th class="r" title="Очки за фіналістів">Фінал</th>'
+        +'<th class="r" title="Очки за чемпіона">Чемп.</th>';
+    } else if(breakdown){
       bhead='<th class="r" title="Скільки точних рахунків вгадано">Рахунок</th>'
         +'<th class="r" title="Скільки разів вгадано різницю голів у матчі">Різниця</th>'
         +'<th class="r" title="Скільки разів вгадано результат матчу (напрямок)">Результат</th>'
@@ -5789,10 +5931,16 @@ function renderPoolTables(){
         +'<th class="r" title="Скільки разів вгадано різницю м\'ячів команди (після завершення групи)">Різн.<sub>гр</sub></th>'
         +'<th class="r" title="Скільки разів вгадано місце команди в групі (після завершення групи)">Місце</th>';
     }
-    const wrapCls=breakdown?'scen-wrap':'lb-wrap';
+    const wrapCls=(breakdown||poMode||nomMode)?'scen-wrap':'lb-wrap';
     const hintTxt=hint+' · '+members.length+' уч. · zero-sum';
     let infoBlock='';
-    if(breakdown){
+    if(poMode){
+      infoBlock='<div style="font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:1rem;line-height:1.6">'
+        +'У колонках — <b style="color:var(--text)">очки за раунд</b> (бал за кожну команду, що реально вийшла в цей раунд). Очки за команду: '
+        +'<b style="color:var(--text)">1/16 ×'+s.r32+'</b> · <b style="color:var(--text)">1/8 ×'+s.r16+'</b> · <b style="color:var(--text)">1/4 ×'+s.r8+'</b> · '
+        +'<b style="color:var(--text)">1/2 ×'+s.r4+'</b> · <b style="color:var(--text)">Фінал ×'+s.final+'</b> · <b style="color:var(--text)">Чемпіон ×'+s.champ+'</b>. '
+        +'Підсумок — у колонці <b style="color:var(--text)">«Очки»</b>.</div>';
+    } else if(breakdown){
       const allG=allGroupMatches();
       const totalG=allG.length;
       const playedG=allG.filter(m=>{const r=S.matches[m.id];return r&&r.h!==''&&r.h!==undefined&&r.a!==''&&r.a!==undefined;}).length;
@@ -5808,7 +5956,7 @@ function renderPoolTables(){
         +'Підсумок — у колонці <b style="color:var(--text)">«Очки»</b>. Категорії таблиці групи (Очки<sub>гр</sub>/Різн.<sub>гр</sub>/Місце) нараховуються лише після завершення всіх матчів групи. '
         +'<b style="color:var(--text)">Влучність</b> — частка зіграних матчів (з прогнозом), де вгадано бодай щось (точний рахунок, різницю або напрямок).</div>';
     }
-    const scrollHint=breakdown?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
+    const scrollHint=(breakdown||poMode||nomMode)?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
     return `<div style="margin-top:2rem">
       <div class="sec-title" style="font-size:18px">${title}</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hintTxt}</p>
@@ -5825,9 +5973,9 @@ function renderPoolTables(){
   const nM=poolMembers(inNomPool);
 
   let out='';
-  out+=poolTable('🥅 Каса: Груповий етап','Хто заповнив усі матчі груп', gM, 'poolGroup', true);
-  out+=poolTable('🏟️ Каса: Плей-оф','Хто заповнив фінал і матч за 3-тє', pM, 'poolPlayoff');
-  out+=poolTable('🏅 Каса: Номінації','Хто заповнив усі номінації', nM, 'poolNoms');
+  out+=poolTable('🥅 Каса: Груповий етап','Хто заповнив усі матчі груп', gM, 'poolGroup', 'group');
+  out+=poolTable('🏟️ Каса: Плей-оф','Хто заповнив фінал і матч за 3-тє', pM, 'poolPlayoff', 'playoff');
+  out+=poolTable('🏅 Каса: Номінації','Хто заповнив усі номінації', nM, 'poolNoms', 'noms');
 
   host.innerHTML=out;
 }
@@ -5910,29 +6058,11 @@ function renderLeaderboard(){
   renderSummaryTable();
   const curr=S.currency||{code:'UAH',rate:1};
   const data=S.participants.map(n=>({n,...calcPts(n)})).sort((a,b)=>b.total-a.total);
-  const max=data[0]?.total||1;
-  document.getElementById('lb-body').innerHTML=data.map((p,i)=>{
-    const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
-    const inPO=inPlayoffPool(p.n);
-    const inNm=inNomPool(p.n);
-    const poCell=v=>inPO?`<td class="sub-cell">${v}</td>`:'<td class="sub-cell" style="color:var(--muted)">—</td>';
-    const nmCell=v=>inNm?`<td class="sub-cell">${v}</td>`:'<td class="sub-cell" style="color:var(--muted)">—</td>';
-    return`<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell" style="cursor:pointer" title="Сценарій: якщо все складеться для цього гравця" onclick="renderScenario('${p.n.replace(/'/g,"\\'")}');document.getElementById('lb-scenario-section')?.scrollIntoView({behavior:'smooth'})">${p.n}</td>
-      <td class="sub-cell">${p.matchPts}</td><td class="sub-cell">${p.groupPts}</td>
-      ${poCell(p.r32)}${poCell(p.r16)}
-      ${poCell(p.r8)}${poCell(p.r4)}
-      ${poCell(p.fin)}${poCell(p.champ)}
-      ${nmCell(p.nomPts)}
-      <td class="pts-cell">${p.total}</td>
-      ${(()=>{const acc=matchAccuracy(p.n);if(!acc)return '<td class="r pool-col" style="color:var(--muted)">·</td>';const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';return `<td class="r pool-col" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;})()}
-    </tr>`;
-  }).join('');
 
-  // Загальна каса показується у зведеній таблиці (Σ Баланс) та касових таблицях нижче.
-  const cashEl=document.getElementById('lb-cash-total');
-  if(cashEl)cashEl.innerHTML='';
+  // ── Pt3: Таблиця «Основний етап» (групи+плей-оф, лише повні учасники) ──
+  renderMainStageTable();
 
-  // ── Секція «Каси» (4 окремі zero-sum пули) ──
+  // ── Секція «Каси» (zero-sum пули) ──
   renderPoolTables();
 
   // ── Секція «Сценарій» (за замовчуванням — поточний лідер) ──

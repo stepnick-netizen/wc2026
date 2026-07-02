@@ -4745,14 +4745,15 @@ function renderAllPredsBody(){
   }
   // ── Підсумок плей-офф ──────────────────────────────────────────
   {
-    const playoffTotal=(pts.r32||0)+(pts.r16||0)+(pts.r8||0)+(pts.r4||0)+(pts.fin||0)+(pts.champ||0);
-    let pobal=0;
-    others2.forEach(n2=>{
-      const p2pts=calcPts(n2);
-      const their=(p2pts.r32||0)+(p2pts.r16||0)+(p2pts.r8||0)+(p2pts.r4||0)+(p2pts.fin||0)+(p2pts.champ||0);
-      pobal+=(playoffTotal-their);
-    });
-    const pobalMoney=Math.round(pobal*(curr2.rate||1));
+    // poolPlayoff = рахунки матчів плей-офф (matchPtsPlayoff) + командні бали
+    // (r32..champ). Це та сама величина, що йде в касу «Плей-оф» на Рейтингу,
+    // тож число тут збігається з колонкою «Очки» там.
+    const playoffTotal=pts.poolPlayoff||0;
+    // Гроші беремо з канонічного zero-sum балансу каси плей-офф
+    // (calcPoolBalanceBreakdown), а не з наївної суми різниць — інакше
+    // сума не збіжиться з Рейтингом (там largest-remainder і лише
+    // плейофф-учасники).
+    const pobalMoney=calcPoolBalanceBreakdown(name).playoff||0;
     const poCol=playoffTotal>0?'var(--gold)':'var(--muted)';
     const poBalCol=pobalMoney>0?'var(--green2)':pobalMoney<0?'#ff6b6b':'var(--muted)';
     if(playoffTotal>0||real_any_played()){

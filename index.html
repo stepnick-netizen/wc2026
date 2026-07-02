@@ -1599,6 +1599,68 @@ function calcPoolBalances(memberNames, ptsField, rate){
   return calcAllBalances(data, +rate||1);
 }
 
+// ── ПОРАУНДОВІ бали плей-офф (для карток на «Прогнози всіх») ─────────
+// Обидві функції відтворюють ту саму логіку, що calcDetailedPts, але
+// повертають бали ЛИШЕ за один раунд, для довільного учасника. Потрібні,
+// щоб рахувати порaундовий касовий (zero-sum) баланс — той самий метод, що
+// й у касі: calcAllBalances серед плейофф-учасників.
+const _isRealPoTeam=t=>t&&!String(t).startsWith('Матч')&&!String(t).startsWith('Пер.')&&!String(t).startsWith('Переможець')&&!String(t).startsWith('TBD')&&t!=='Команда B'&&t!=='—';
+
+// Бали за РАХУНКИ матчів одного раунду плей-офф (той самий підрахунок, що в
+// calcDetailedPts → matchPtsPlayoff, але тільки для roundId).
+function poRoundMatchPts(name, roundId){
+  if(!inPlayoffPool(name))return 0;
+  const s=S.scoring,pred=S.predictions[name]||{},pm=pred.matches||{};
+  const round=PLAYOFF_ROUNDS.find(r=>r.id===roundId);
+  if(!round)return 0;
+  let predSlots=[];
+  try{predSlots=getPredSlotsForRound(roundId,pred);}catch(e){}
+  let sum=0;
+  for(let i=0;i<round.n;i++){
+    const mid=poId(roundId,i),res=S.matches[mid];
+    if(!res||res.h===''||res.h===undefined)continue;
+    const slot=(S.playoffSlots||{})[mid]||{};
+    const realHome=slot.home||'',realAway=slot.away||'';
+    if(!_isRealPoTeam(realHome)||!_isRealPoTeam(realAway))continue;
+    let predSlotIdx=-1;
+    for(let j=0;j<predSlots.length;j++){
+      const ps=predSlots[j];
+      if(ps.home===realHome&&ps.away===realAway){predSlotIdx=j;break;}
+      if(ps.home===realAway&&ps.away===realHome){predSlotIdx=j;break;}
+    }
+    if(predSlotIdx===-1)continue;
+    const p=pm[poId(roundId,predSlotIdx)];
+    if(!p||p.h===''||p.h===undefined)continue;
+    const predHome=predSlots[predSlotIdx].home;
+    const rH=+res.h,rA=+res.a;
+    let pH,pA;
+    if(predHome===realHome){pH=+p.h;pA=+p.a;}else{pH=+p.a;pA=+p.h;}
+    const sc=scoreMatch(rH,rA,pH,pA,s);
+    sum+=sc.exact+sc.result+sc.diff;
+  }
+  return sum;
+}
+
+// Командні бали за прохід у раунді roundId (для final включає бали за чемпіона).
+function poRoundTeamPts(name, roundId){
+  const p=calcPts(name);
+  const key={r32:'r32',r16:'r16',r8:'r8',r4:'r4',final:'fin'}[roundId];
+  if(!key)return 0;
+  return (p[key]||0)+(roundId==='final'?(p.champ||0):0);
+}
+
+// Касовий (zero-sum) баланс одного раунду: той самий allocator, що й у касі
+// плей-офф (calcAllBalances, largest-remainder), але total = бали за раунд,
+// серед плейофф-учасників. ptsFn(n) → бали учасника n за цей зріз.
+function poRoundCashBalance(name, ptsFn){
+  if(!inPlayoffPool(name))return 0;
+  const rate=(S.currency||{rate:1}).rate||1;
+  const members=poolMembers(inPlayoffPool);
+  const data=members.map(n=>({n, total:ptsFn(n)||0}));
+  if(data.length===0)return 0;
+  return calcAllBalances(data, +rate||1).get(name)||0;
+}
+
 // Зведений баланс гравця по всіх 4 касах (сума балансів тих кас, де він бере участь).
 // Кожна каса окремо zero-sum → сума всіх зведених балансів теж == 0.
 function calcPoolBalanceBreakdown(name){
@@ -4570,14 +4632,9 @@ function renderAllPredsBody(){
     // Per-round pts
     const roundPtsKey={r32:'r32',r16:'r16',r8:'r8',r4:'r4',final:'fin'}[round.id];
     const roundPts=roundPtsKey?(pts[roundPtsKey]||0)+(round.id==='final'?(pts.champ||0):0):0;
-    // Per-round balance vs others
-    let roundBal=0;
-    others2.forEach(n2=>{
-      const p2=calcPts(n2);
-      const theirRound=roundPtsKey?(p2[roundPtsKey]||0)+(round.id==='final'?(p2.champ||0):0):0;
-      roundBal+=(roundPts-theirRound);
-    });
-    const roundMoney=Math.round(roundBal*(curr2.rate||1));
+    // Порaундовий КАСОВИЙ баланс (zero-sum серед плейофф-учасників, той самий
+    // метод, що й у касі на Рейтингу): total = командні бали за цей раунд.
+    const roundMoney=roundPtsKey?poRoundCashBalance(name,n2=>poRoundTeamPts(n2,round.id)):0;
     const rBalCol=roundMoney>0?'var(--green2)':roundMoney<0?'#ff6b6b':'var(--muted)';
     const rPtsCol=roundPts>0?'var(--gold)':'var(--muted)';
     html+=`<div class="card-sm"><div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin-bottom:8px">${round.label.toUpperCase()}</div>`;
@@ -4695,40 +4752,9 @@ function renderAllPredsBody(){
       if(roundHtml){
         anyMatchHtml=true;
         const rScPts=rMatchPts;
-        // Balance vs others for this round's match scores
-        let rScBal=0;
-        others2.forEach(n2=>{
-          let their=0;
-          const pred2=S.predictions[n2]||{};
-          const pm2=pred2.matches||{};
-          let predSlots2={};
-          try{predSlots2[round.id]=getPredSlotsForRound(round.id,pred2);}catch(e){predSlots2[round.id]=[];}
-          const ps2=predSlots2[round.id]||[];
-          for(let i=0;i<round.n;i++){
-            const mid=`${round.id}_${i}`;
-            const res=S.matches[mid];
-            if(!res||res.h===''||res.h===undefined)continue;
-            const realSlot2=(S.playoffSlots||{})[mid]||{};
-            const rH2=realSlot2.home||'',rA2=realSlot2.away||'';
-            if(!isRealTeam(rH2)||!isRealTeam(rA2))continue;
-            let idx2=-1,sw2=false;
-            for(let j=0;j<ps2.length;j++){
-              if(ps2[j].home===rH2&&ps2[j].away===rA2){idx2=j;break;}
-              if(ps2[j].home===rA2&&ps2[j].away===rH2){idx2=j;break;}
-            }
-            if(idx2===-1)continue;
-            const p2=pm2[`${round.id}_${idx2}`];
-            if(!p2||p2.h===''||p2.h===undefined)continue;
-            const rH=+res.h,rA=+res.a;
-            const predHome2=ps2[idx2].home;
-            const p2H=(predHome2===rH2)?+p2.h:+p2.a;
-            const p2A=(predHome2===rH2)?+p2.a:+p2.h;
-            const sc2=scoreMatch(rH,rA,p2H,p2A,rScoring);
-            their+=sc2.exact+sc2.result+sc2.diff;
-          }
-          rScBal+=(rScPts-their);
-        });
-        const rScBalMoney=Math.round(rScBal*(curr2.rate||1));
+        // Порaундовий КАСОВИЙ баланс за рахунки матчів цього раунду
+        // (zero-sum серед плейофф-учасників, той самий метод, що й у касі).
+        const rScBalMoney=poRoundCashBalance(name,n2=>poRoundMatchPts(n2,round.id));
         const rScBalCol=rScBalMoney>0?'var(--green2)':rScBalMoney<0?'#ff6b6b':'var(--muted)';
         const rScPtsCol=rScPts>0?'var(--gold)':'var(--muted)';
         roundCards+=`<div class="card-sm"><div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--gold);margin-bottom:6px">${round.label.toUpperCase()}</div>${roundHtml}

@@ -4977,6 +4977,71 @@ function renderAllPredsBody(){
         let anyBonusMatchHtml=false;
         let bonusRoundCards='';
 
+        // ── 1/16 (r32): рахунки матчів бонусу за фактично зіграні матчі ──
+        // Слоти беремо напряму з реальної сітки 1/16 (getRealR32Slots),
+        // збіг за індексом слота. Бали — взаємовиключно (exact|diff|result),
+        // як у calcPts. Показуємо картку так само, як для головного плей-офф.
+        {
+          const bR32realSlots=getRealR32Slots();
+          let r32Html='';
+          let bR32Pts=0;
+          for(let i=0;i<bR32realSlots.length;i++){
+            const res=S.matches[`r32_${i}`]||(br.results||{})[`b_r32_${i}`];
+            if(!res||res.h===''||res.h===undefined)continue;
+            const slot=bR32realSlots[i]||{};
+            const realHome=slot.home||'',realAway=slot.away||'';
+            if(!isRealTeamB(realHome)||!isRealTeamB(realAway))continue;
+            const rH=+res.h,rA=+res.a;
+            let col='var(--muted)',label='',dispScore='—';
+            const p=bpm[`b_r32_${i}`];
+            const hasPred=p&&p.h!==''&&p.h!==undefined&&p.a!==''&&p.a!==undefined;
+            if(hasPred){
+              const pH=+p.h,pA=+p.a;
+              dispScore=`${pH}:${pA}`;
+              const sc=scoreMatch(rH,rA,pH,pA,{exact:br.ptsScore||3,result:br.ptsResult||1,diff:br.ptsDiff||0});
+              bR32Pts+=sc.exact?sc.exact:(sc.diff?sc.diff:sc.result);
+              if(pH===rH&&pA===rA){col='var(--green2)';label='✓';}
+              else if(Math.sign(pH-pA)===Math.sign(rH-rA)&&(pH-pA)===(rH-rA)){col='#ff9500';label='≈';}
+              else if(Math.sign(pH-pA)===Math.sign(rH-rA)){col='#5b9fd4';label='~';}
+              else{col='#ff6b6b';label='✗';}
+            }
+            const opacity=hasPred?'':';opacity:0.4';
+            r32Html+=`<div style="display:flex;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px${opacity}">
+              <span style="flex:1;font-size:11px">${realHome}</span>
+              <span style="font-family:'Bebas Neue';font-size:14px;color:${col}">${dispScore}${label?` <span style="font-size:10px">${label}</span>`:''}</span>
+              <span style="flex:1;text-align:right;font-size:11px">${realAway}</span>
+            </div>`;
+          }
+          if(r32Html){
+            anyBonusMatchHtml=true;
+            // Баланс проти інших учасників бонусу — тільки за рахунки 1/16
+            let bR32Bal=0;
+            bParts.filter(n2=>n2!==name).forEach(n2=>{
+              let their=0;
+              const bpm2=((br.predictions[n2]||{}).matches)||{};
+              for(let i=0;i<bR32realSlots.length;i++){
+                const res=S.matches[`r32_${i}`]||(br.results||{})[`b_r32_${i}`];
+                if(!res||res.h===''||res.h===undefined)continue;
+                const slot=bR32realSlots[i]||{};
+                if(!isRealTeamB(slot.home||'')||!isRealTeamB(slot.away||''))continue;
+                const p2=bpm2[`b_r32_${i}`];
+                if(!p2||p2.h===''||p2.h===undefined||p2.a===''||p2.a===undefined)continue;
+                const sc2=scoreMatch(+res.h,+res.a,+p2.h,+p2.a,{exact:br.ptsScore||3,result:br.ptsResult||1,diff:br.ptsDiff||0});
+                their+=sc2.exact?sc2.exact:(sc2.diff?sc2.diff:sc2.result);
+              }
+              bR32Bal+=(bR32Pts-their);
+            });
+            const bR32BalMoney=Math.round(bR32Bal*bRate);
+            const bR32BalCol=bR32BalMoney>0?'var(--green2)':bR32BalMoney<0?'#ff6b6b':'var(--muted)';
+            const bR32PtsCol=bR32Pts>0?'var(--blue3)':'var(--muted)';
+            bonusRoundCards+=`<div class="card-sm"><div style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--blue3);margin-bottom:6px">1/16 ФІНАЛУ</div>${r32Html}
+              <div style="margin-top:5px;padding-top:4px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px">
+                <b style="color:${bR32PtsCol}">${bR32Pts} оч.</b>
+                ${bParts.length>1?`<span style="color:var(--muted)">·</span><b style="color:${bR32BalCol}">${bR32BalMoney>=0?'+':''}${bR32BalMoney} ${bCurr.code}</b>`:''}
+              </div></div>`;
+          }
+        }
+
         PLAYOFF_ROUNDS.forEach(round=>{
           if(round.id==='r32')return;
           const predSlotsB=bPredSlots[round.id]||[];

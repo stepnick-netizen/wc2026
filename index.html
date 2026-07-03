@@ -6342,9 +6342,12 @@ function delNom(i){S.nominations.splice(i,1);save();aTab('nominations',document.
 function updNomPts(i,v){S.nominations[i].pts=+v;save();}
 
 function aResults(){
-  return aResultsGroup();
+  // Відновлюємо останню активну під-вкладку (група/плей-офф), щоб повний
+  // перерендер (напр. після збереження результату) не скидав нас на групи.
+  return (window._aResMode==='playoff')?aResultsPlayoff():aResultsGroup();
 }
 function aResultsGroup(){
+  window._aResMode='group';
   let html='<div class="apanel-title">Результати матчів — Групова стадія</div>';
   // Stage tabs
   html+=`<div class="stage-tabs" style="margin-bottom:1rem">
@@ -6355,7 +6358,19 @@ function aResultsGroup(){
   html+='</div>';
   return html;
 }
+function aResultsPlayoff(){
+  window._aResMode='playoff';
+  let html='<div class="apanel-title">Результати матчів — Плей-офф</div>';
+  html+=`<div class="stage-tabs" style="margin-bottom:1rem">
+    <div class="stab" onclick="aResultsSwitch('group',this)">Групова стадія</div>
+    <div class="stab active" onclick="aResultsSwitch('playoff',this)">Плей-офф</div>
+  </div><div id="ares-content">`;
+  html+=buildAResultsPlayoffHTML();
+  html+='</div>';
+  return html;
+}
 function aResultsSwitch(mode,el){
+  window._aResMode=mode;
   document.querySelectorAll('#apanel .stab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   const el2=document.getElementById('ares-content');
@@ -6550,14 +6565,27 @@ function renderLive(){
     return;
   }
   let html='';
-  ids.forEach(mid=>{
+  const canReorder=(typeof adminUnlocked!=='undefined'&&adminUnlocked);
+  ids.forEach((mid,ordIdx)=>{
     const info=liveMatchInfo(mid);
     const res=S.matches[mid];
     const live=res&&res.h!==''&&res.h!==undefined?(res.h+':'+res.a):'— : —';
-    html+='<div style="margin-bottom:1.5rem;background:var(--bg2);border:1px solid rgba(255,107,107,.3);border-radius:12px;overflow:hidden">';
+    html+='<div class="live-card" data-mid="'+escapeAttr(mid)+'"'
+      +(canReorder?' draggable="true" ondragstart="liveDragStart(event,\''+escapeAttr(mid)+'\')" ondragover="liveDragOver(event)" ondragleave="liveDragLeave(event)" ondrop="liveDrop(event,\''+escapeAttr(mid)+'\')" ondragend="liveDragEnd(event)"':'')
+      +' style="margin-bottom:1.5rem;background:var(--bg2);border:1px solid rgba(255,107,107,.3);border-radius:12px;overflow:hidden">';
     html+='<div style="background:rgba(192,57,43,.15);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
-    html+='<div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px"><span style="color:#ff6b6b">🔴 LIVE</span> '+(info.home.iso?flag(info.home.iso):(info.home.flagHtml||''))+escapeHtml(info.home.n)+' — '+(info.away.iso?flag(info.away.iso):(info.away.flagHtml||''))+escapeHtml(info.away.n)+'</div>';
+    html+='<div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px">'
+      +(canReorder?'<span style="color:var(--muted);cursor:grab;font-size:16px;user-select:none" title="Перетягни, щоб змінити порядок">⠿</span> ':'')
+      +'<span style="color:#ff6b6b">🔴 LIVE</span> '+(info.home.iso?flag(info.home.iso):(info.home.flagHtml||''))+escapeHtml(info.home.n)+' — '+(info.away.iso?flag(info.away.iso):(info.away.flagHtml||''))+escapeHtml(info.away.n)+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:10px">';
+    if(canReorder){
+      html+='<div style="display:flex;gap:4px">'
+        +'<button class="btn btn-ghost btn-sm" onclick="moveLiveMatch(\''+escapeAttr(mid)+'\',-1)"'+(ordIdx===0?' disabled style="opacity:.35"':'')+' title="Вгору">↑</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="moveLiveMatch(\''+escapeAttr(mid)+'\',1)"'+(ordIdx===ids.length-1?' disabled style="opacity:.35"':'')+' title="Вниз">↓</button>'
+        +'</div>';
+    }
     html+='<div style="font-family:\'Bebas Neue\';font-size:24px;color:var(--gold)">'+live+'</div>';
+    html+='</div>';
     html+='</div>';
     const hasRes=res&&res.h!==''&&res.h!==undefined;
     const bonusOn=!!(S.bonusRound&&S.bonusRound.active);
@@ -6801,6 +6829,65 @@ function renderLive(){
   el.innerHTML=html;
 }
 
+// ── Перестановка LIVE-матчів (лише адмін) ─────────────────────────────
+// Порядок карток = порядок S.liveMatches. Пересуваємо елемент масиву й
+// зберігаємо (стан спільний, синхронізується в Sheets), потім перемальовуємо.
+function moveLiveMatch(mid,dir){
+  if(typeof adminUnlocked==='undefined'||!adminUnlocked)return;
+  if(!Array.isArray(S.liveMatches))return;
+  const i=S.liveMatches.indexOf(mid);
+  if(i<0)return;
+  const j=i+dir;
+  if(j<0||j>=S.liveMatches.length)return;
+  const arr=S.liveMatches;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  save();
+  renderLive();
+}
+// Drag&drop (десктоп): кладемо перетягнутий mid ПЕРЕД тим, на який кинули.
+let _liveDragMid=null;
+function liveDragStart(ev,mid){
+  if(typeof adminUnlocked==='undefined'||!adminUnlocked){ev.preventDefault();return;}
+  _liveDragMid=mid;
+  try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',mid);}catch(e){}
+  const card=ev.currentTarget;
+  if(card)setTimeout(()=>{card.style.opacity='0.4';},0);
+}
+function liveDragOver(ev){
+  if(!_liveDragMid)return;
+  ev.preventDefault();
+  try{ev.dataTransfer.dropEffect='move';}catch(e){}
+  const card=ev.currentTarget;
+  if(card)card.style.outline='2px dashed rgba(255,107,107,.6)';
+}
+function liveDragLeave(ev){
+  const card=ev.currentTarget;
+  if(card)card.style.outline='';
+}
+function liveDrop(ev,targetMid){
+  ev.preventDefault();
+  const card=ev.currentTarget;
+  if(card)card.style.outline='';
+  if(typeof adminUnlocked==='undefined'||!adminUnlocked)return;
+  const dragMid=_liveDragMid;
+  _liveDragMid=null;
+  if(!dragMid||dragMid===targetMid||!Array.isArray(S.liveMatches))return;
+  const arr=S.liveMatches;
+  const from=arr.indexOf(dragMid), to=arr.indexOf(targetMid);
+  if(from<0||to<0)return;
+  arr.splice(from,1);
+  // після видалення індекс цілі міг зсунутися
+  const insAt=arr.indexOf(targetMid);
+  arr.splice(insAt<0?arr.length:insAt,0,dragMid);
+  save();
+  renderLive();
+}
+function liveDragEnd(ev){
+  _liveDragMid=null;
+  const card=ev.currentTarget;
+  if(card){card.style.opacity='';card.style.outline='';}
+  document.querySelectorAll('.live-card').forEach(c=>{c.style.opacity='';c.style.outline='';});
+}
 function buildAGroupMatchRows(g){
   const gd=GROUPS[g];
   let html=`<div id="ares-matches">`;

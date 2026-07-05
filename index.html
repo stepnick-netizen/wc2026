@@ -6185,7 +6185,8 @@ function renderLeaderboard(){
     <div style="margin-top:2rem">
       <div class="sec-title" style="font-size:18px">🎯 ${br.label||'Бонусний раунд'}</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Окремий рейтинг · Ставка: 1 очко = ${br.rate||1} ${bCode}</p>
-      <div class="lb-wrap"><table class="lb-table">
+      <div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>
+      <div class="scen-wrap"><table class="lb-table">
         <thead><tr>
           <th>#</th><th>Учасник</th>
           <th class="r">Рахунки</th>
@@ -6410,7 +6411,9 @@ function toggleLive(mid){
   // Перемалювати адмін-екран (кнопка) і навігацію (вкладка Live)
   if(typeof syncLiveTab==='function')syncLiveTab();
   const el2=document.getElementById('ares-content');
-  if(el2)el2.innerHTML=buildAResultsGroupHTML();
+  // Перемальовуємо ПОТОЧНУ під-вкладку (група/плей-офф), а не завжди групу —
+  // інакше з плей-офф нас викидало на групову стадію.
+  if(el2)el2.innerHTML=(window._aResMode==='playoff')?buildAResultsPlayoffHTML():buildAResultsGroupHTML();
 }
 // Інфо про груповий матч за його id (команди). Повертає null для не-групового.
 function liveMatchInfo(mid){
@@ -6965,9 +6968,9 @@ function clearResInline(mid){
   delete S.matches[mid];
   save();
   toast('Результат видалено');
-  // Re-render current active results tab
+  // Перемальовуємо поточну під-вкладку (з _aResMode, з фолбеком на активний таб)
   const activeTab=document.querySelector('#apanel .stage-tabs .stab.active');
-  const mode=activeTab?.textContent?.trim()==='Плей-офф'?'playoff':'group';
+  const mode=window._aResMode||(activeTab?.textContent?.trim()==='Плей-офф'?'playoff':'group');
   const el2=document.getElementById('ares-content');
   if(el2)el2.innerHTML=mode==='playoff'?buildAResultsPlayoffHTML():buildAResultsGroupHTML();
 }

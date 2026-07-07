@@ -5795,6 +5795,176 @@ function renderAwards(){
       value:`На ${mostUnderrated[1].toFixed(1)} раунди далі прогнозу`,color:'var(--gold)'});
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // МАТАН-РОК — нові математичні номінації (лише груповий етап)
+  // ══════════════════════════════════════════════════════════════
+  // Хронологія за туром (matchday), а не за алфавітом груп.
+  const MD_OF_K={0:1,1:2,2:3,3:3,4:2,5:1};
+  const seqMatches=[...played].sort((a,b)=>
+    (MD_OF_K[a.k]-MD_OF_K[b.k]) || (a.g<b.g?-1:a.g>b.g?1:0) || (a.k-b.k));
+
+  // Розширена статистика по матчу: хто скільки набрав + модальний рахунок.
+  const mx={};
+  played.forEach(m=>{
+    const res=getRes(m.id); if(!res)return;
+    const rH=+res.h,rA=+res.a;
+    const byName={}; let N=0,hitCount=0,sumPts=0; const freq={};
+    S.participants.forEach(name=>{
+      const p=getPred(name,m.id);
+      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
+      const pH=+p.h,pA=+p.a;
+      const sc=scoreMatch(rH,rA,pH,pA,S.scoring);
+      const pts=sc.exact+sc.result+sc.diff;
+      byName[name]={pts,hit:pts>0,exact:!!sc.exact,ph:pH,pa:pA};
+      N++; if(pts>0)hitCount++; sumPts+=pts;
+      const key=pH+':'+pA; freq[key]=(freq[key]||0)+1;
+    });
+    let modeKey=null,modeCount=0;
+    Object.keys(freq).forEach(k=>{if(freq[k]>modeCount){modeCount=freq[k];modeKey=k;}});
+    mx[m.id]={rH,rA,N,hitCount,sumPts,byName,modeKey};
+  });
+  const allGm=allGroupMatches();
+
+  // ── Чисті математичні хелпери ──
+  const _log2=x=>Math.log(x)/Math.LN2;
+  const _mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+  function _pearson(xs,ys){
+    const n=xs.length; if(n<2)return null;
+    const mX=_mean(xs),mY=_mean(ys); let sxy=0,sxx=0,syy=0;
+    for(let i=0;i<n;i++){const dx=xs[i]-mX,dy=ys[i]-mY;sxy+=dx*dy;sxx+=dx*dx;syy+=dy*dy;}
+    if(sxx===0||syy===0)return null;
+    return sxy/Math.sqrt(sxx*syy);
+  }
+  function _slope(ys){
+    const n=ys.length; if(n<2)return null;
+    const mX=(n-1)/2,mY=_mean(ys); let sxy=0,sxx=0;
+    for(let i=0;i<n;i++){const dx=i-mX;sxy+=dx*(ys[i]-mY);sxx+=dx*dx;}
+    if(sxx===0)return null;
+    return sxy/sxx;
+  }
+  function _entropy(counts){
+    const tot=counts.reduce((s,c)=>s+c,0); if(tot===0)return 0;
+    let h=0; counts.forEach(c=>{if(c>0){const p=c/tot;h-=p*_log2(p);}});
+    return h;
+  }
+  function _wilsonLB(hits,n){
+    if(n===0)return 0;
+    const z=1.96,p=hits/n,denom=1+z*z/n;
+    const centre=p+z*z/(2*n);
+    const margin=z*Math.sqrt((p*(1-p)+z*z/(4*n))/n);
+    return (centre-margin)/denom;
+  }
+  const _longestRun=(arr,val)=>{let best=0,cur=0;arr.forEach(x=>{if(x===val){cur++;if(cur>best)best=cur;}else cur=0;});return best;};
+
+  const MINQ=Math.max(3, Math.ceil(playedCount*0.25));
+  const pickW=(rows,dir)=>{
+    if(!rows.length)return null;
+    let best=rows[0].val;
+    rows.forEach(r=>{if(dir==='max'?r.val>best:r.val<best)best=r.val;});
+    return {names:rows.filter(r=>r.val===best).map(r=>r.n), val:best};
+  };
+
+  // ── Метрики по кожному учаснику ──
+  const M={};
+  S.participants.forEach(name=>{
+    const seqPts=[]; const dPred=[],dReal=[]; const absErr=[];
+    let exactHits=0,nPred=0, actual=0,expected=0,expN=0, solo=0, consM=0,consT=0;
+    seqMatches.forEach(m=>{
+      const cell=mx[m.id]; if(!cell)return;
+      const me=cell.byName[name]; if(!me)return;
+      seqPts.push(me.pts); nPred++; if(me.exact)exactHits++;
+      absErr.push(Math.abs((me.ph+me.pa)-(cell.rH+cell.rA)));
+      dPred.push(me.ph-me.pa); dReal.push(cell.rH-cell.rA);
+      if(me.hit && cell.N>=2 && cell.hitCount>0) solo += me.pts * (-_log2(cell.hitCount/cell.N));
+      if(cell.N>=2){ const othersMean=(cell.sumPts-me.pts)/(cell.N-1); actual+=me.pts; expected+=othersMean; expN++; }
+      if(cell.modeKey){ consT++; if((me.ph+':'+me.pa)===cell.modeKey)consM++; }
+    });
+    const styleFreq={};
+    allGm.forEach(m=>{
+      const p=getPred(name,m.id);
+      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
+      const k=(+p.h)+':'+(+p.a); styleFreq[k]=(styleFreq[k]||0)+1;
+    });
+    const styleCounts=Object.values(styleFreq);
+    const styleTot=styleCounts.reduce((s,c)=>s+c,0);
+    let styleTop=null;
+    if(styleTot){let bk=null,bc=0;Object.keys(styleFreq).forEach(k=>{if(styleFreq[k]>bc){bc=styleFreq[k];bk=k;}});styleTop={k:bk,share:Math.round(100*bc/styleTot)};}
+    const bits=seqPts.map(p=>p>0?1:0);
+    M[name]={
+      nPred, exactHits, styleTop,
+      hotRun:_longestRun(bits,1), coldRun:_longestRun(bits,0),
+      slope: seqPts.length>=Math.max(4,MINQ)? _slope(seqPts): null,
+      mae: absErr.length>=MINQ? _mean(absErr): null,
+      corr: dPred.length>=MINQ? _pearson(dPred,dReal): null,
+      wilson: nPred>0? _wilsonLB(exactHits,nPred): null,
+      hitRate: nPred>0? exactHits/nPred: 0,
+      entropy: styleTot>=Math.max(6,MINQ)? _entropy(styleCounts): null,
+      solo, overExp: expN>0? (actual-expected): null,
+      consensus: consT>=MINQ? consM/consT: null
+    };
+  });
+
+  const rock=[];
+  const rowsOf=sel=>S.participants.map(n=>({n,val:sel(M[n])})).filter(r=>r.val!==null&&r.val!==undefined&&!Number.isNaN(r.val));
+
+  { const w=pickW(rowsOf(m=>m.solo>0?m.solo:null),'max');
+    if(w) rock.push({icon:'🐺',title:'Соло-снайпер',
+      desc:'Влучення важить тим більше, чим менше людей вгадали цей матч (вага = −log₂ частки тих, хто теж влучив). Правота, коли решта помилялась.',
+      winner:joinNames(w.names),value:`${w.val.toFixed(1)} балів рідкості`,color:'var(--gold)'}); }
+
+  { const w=pickW(rowsOf(m=>m.consensus),'max');
+    if(w) rock.push({icon:'🐑',title:'Дзеркало натовпу',
+      desc:'Частка матчів, де рахунок гравця збігся з найпопулярнішим (модальним) прогнозом. Хто грає «як усі».',
+      winner:joinNames(w.names),value:`${Math.round(w.val*100)}% збігів із модою`,color:'var(--muted)'}); }
+
+  { const w=pickW(rowsOf(m=>m.mae),'min');
+    if(w) rock.push({icon:'🎯',title:'Точний приціл',
+      desc:'Найменша середня похибка за сумою голів матчу |прогноз − факт|. Можна стабільно бути «поруч» без жодного точного рахунку.',
+      winner:joinNames(w.names),value:`${w.val.toFixed(2)} гола середня похибка`,color:'var(--green2)'}); }
+
+  { const w=pickW(rowsOf(m=>m.corr),'max');
+    if(w&&w.val>0) rock.push({icon:'📈',title:'Відчуття матчу',
+      desc:'Кореляція Пірсона між прогнозованою і реальною різницею голів (h−a). Хто відчуває, на чиєму боці перевага — навіть не в точний рахунок.',
+      winner:joinNames(w.names),value:`r = ${w.val.toFixed(2)}`,color:'var(--blue3)'}); }
+
+  { const w=pickW(rowsOf(m=>m.hotRun>0?m.hotRun:null),'max');
+    if(w&&w.val>=2) rock.push({icon:'🔥',title:'Гаряча рука',
+      desc:'Найдовша серія матчів поспіль (у порядку турів) з ≥1 набраним очком. Класична «hot hand».',
+      winner:joinNames(w.names),value:`${w.val} матчів поспіль у плюсі`,color:'#ff9f43'}); }
+
+  { const w=pickW(rowsOf(m=>m.coldRun>0?m.coldRun:null),'max');
+    if(w&&w.val>=2) rock.push({icon:'🧊',title:'Крижаний душ',
+      desc:'Найдовша серія матчів поспіль без жодного очка. Антипод гарячої руки.',
+      winner:joinNames(w.names),value:`${w.val} матчів поспіль у нулі`,color:'var(--blue3)'}); }
+
+  { const w=pickW(rowsOf(m=>m.slope),'max');
+    if(w&&w.val>0) rock.push({icon:'🚀',title:'На підйомі',
+      desc:'Нахил лінії тренду очок-за-матч по ходу турів (лінійна регресія). Хто розігрався до кінця групового етапу.',
+      winner:joinNames(w.names),value:`нахил +${w.val.toFixed(2)} оч./матч`,color:'var(--green2)'}); }
+
+  { const w=pickW(rowsOf(m=>m.wilson),'max');
+    if(w&&w.val>0){ const nm=w.names[0];
+      rock.push({icon:'🎓',title:'Влучність',
+      desc:'Частка точних рахунків, згладжена нижньою межею Вілсона: мала вибірка карається, тож «1 з 1» не переможе «8 з 20».',
+      winner:joinNames(w.names),
+      value:`${M[nm].exactHits}/${M[nm].nPred} точних · ${Math.round(M[nm].hitRate*100)}%`,color:'var(--gold)'}); } }
+
+  { const w=pickW(rowsOf(m=>m.entropy),'max');
+    if(w) rock.push({icon:'🌈',title:'Різнобарв\'я',
+      desc:'Ентропія Шеннона розкиду рахунків у прогнозах (у бітах): що різноманітніші рахунки — то вище. Хто не боїться екзотики.',
+      winner:joinNames(w.names),value:`H = ${w.val.toFixed(2)} біт`,color:'#a06bff'}); }
+
+  { const w=pickW(rowsOf(m=>m.entropy),'min');
+    if(w){ const nm=w.names[0],st=M[nm].styleTop;
+      rock.push({icon:'🎵',title:'Однієї ноти',
+      desc:'Найнижча ентропія рахунків: майже завжди той самий улюблений рахунок. Мінімалізм як стиль.',
+      winner:joinNames(w.names),value:st?`H = ${w.val.toFixed(2)} біт · ${st.share}% рахунку ${st.k}`:`H = ${w.val.toFixed(2)} біт`,color:'var(--muted)'}); } }
+
+  { const w=pickW(rowsOf(m=>m.overExp),'max');
+    if(w&&w.val>0) rock.push({icon:'🍀',title:'Над очікування',
+      desc:'Набрані очки мінус «очікувані» — середні очки решти учасників на тих самих матчах. Додатній залишок = переграв поле (майстерність чи фарт).',
+      winner:joinNames(w.names),value:`+${w.val.toFixed(1)} оч. над полем`,color:'var(--gold)'}); }
+
   // ── Render ──
   let html2=`<div style="margin-bottom:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <div style="font-size:13px;color:var(--muted)">Зіграно матчів</div>
@@ -5804,6 +5974,7 @@ function renderAwards(){
     <div style="font-size:11px;color:var(--muted);margin-left:auto">Оновлюється після кожного матчу</div>
   </div>`;
 
+  html2+=`<div class="sec-title" style="font-size:20px;margin-top:.25rem">Номінації групового раунду</div>`;
   html2+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">`;
   awards.forEach(a=>{
     const isFeatured=a.featured;
@@ -5827,6 +5998,28 @@ function renderAwards(){
     </div>`;
   });
   html2+=`</div>`;
+
+  // ── МАТАН-РОК блок ──
+  if(rock.length){
+    html2+=`<div style="margin-top:2.25rem;margin-bottom:.75rem;padding:.65rem .95rem;border-left:4px solid #ff2d55;background:linear-gradient(90deg,rgba(255,45,85,.10),transparent);border-radius:0 8px 8px 0">
+      <div style="font-family:'Bebas Neue';font-size:26px;letter-spacing:2px;color:#fff">🤘 МАТАН-РОК</div>
+      <div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:2px">аналітика на повній гучності — рідкість влучень, точність, серії, тренд і фарт</div>
+    </div>`;
+    html2+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">`;
+    rock.forEach(a=>{
+      const body=`<div style="font-size:15px;font-weight:700;color:${a.color};margin-bottom:3px">${a.winner}</div>
+        ${a.value?`<div style="font-size:12px;color:var(--muted)">${a.value}</div>`:''}`;
+      html2+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:#ff2d55;opacity:.55"></div>
+        <div style="font-size:28px;margin-bottom:.5rem">${a.icon}</div>
+        <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:#fff;margin-bottom:3px">${a.title}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:.75rem;line-height:1.5">${a.desc}</div>
+        ${body}
+      </div>`;
+    });
+    html2+=`</div>`;
+  }
+
 
   // ── Особиста статистика ──
   html2+=`<div style="margin-top:2rem"><div class="sec-title" style="font-size:20px">Особиста статистика</div>

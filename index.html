@@ -6009,16 +6009,19 @@ function renderPoolTables(){
         bd=bc(d.exactCount||0)+bc(d.diffCount||0)+bc(d.resultCount||0)
           +bc(d.groupPtsCount||0)+bc(d.goalDiffCount||0)+bc(d.placeCount||0);
       }
-      let accCell='<td class="r pool-col" style="color:var(--muted)">·</td>';
-      const acc=matchAccuracy(row.n);
-      if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r pool-col" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
+      let accCell='';
+      if(!nomMode){
+        accCell='<td class="r pool-col" style="color:var(--muted)">·</td>';
+        const acc=matchAccuracy(row.n);
+        if(acc){const col=acc.pct>=60?'var(--green2)':acc.pct>=35?'var(--gold)':'#ff8a8a';accCell=`<td class="r pool-col" style="color:${col};font-weight:700" title="${acc.hit} з ${acc.total} матчів з прогнозом">${acc.pct}%</td>`;}
+      }
       return `<tr><td class="rank-cell ${rc}">${r}</td><td class="name-cell">${escapeHtml(row.n)}</td>
         ${bd}<td class="pts-cell">${row.pts}</td>${balEl}
         ${accCell}</tr>`;
     }).join('');
     let bhead='';
     if(nomMode){
-      bhead=nomsList.map(nm=>`<th class="r" title="${escapeAttr(nm.name)} (${nm.pts} оч.)${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}</th>`).join('');
+      bhead=nomsList.map(nm=>`<th class="r" title="${escapeAttr(nm.name)}${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}<br><span style="font-weight:400;color:var(--muted);font-size:9px">${nm.pts} оч.</span></th>`).join('');
     } else if(poMode){
       bhead='<th class="r" title="Скільки точних рахунків матчів плей-оф вгадано">Рахунок</th>'
         +'<th class="r" title="Скільки разів вгадано різницю голів у матчі плей-оф">Різниця</th>'
@@ -6064,6 +6067,26 @@ function renderPoolTables(){
         +'<b style="color:var(--text)">Влучність</b> — частка зіграних матчів (з прогнозом), де вгадано бодай щось (точний рахунок, різницю або напрямок).</div>';
     }
     const scrollHint=(breakdown||poMode||nomMode)?'<div class="scen-hint">← гортайте вбік, щоб побачити всі категорії →</div>':'';
+    if(nomMode){
+      // Загальна каса номінацій = сума виграшів (== сума програшів) серед учасників.
+      let pot=0; members.forEach(n=>{const b=balMap.get(n)||0; if(b>0)pot+=b;});
+      const nColspan=nomsList.length; // колонки номінацій під «Учасник»
+      const foot=`<tfoot><tr style="border-top:2px solid var(--border2);font-weight:700">
+        <td></td><td class="name-cell">Каса</td>
+        <td class="sub-cell" colspan="${nColspan}" style="color:var(--muted);text-align:right;font-weight:400;font-size:11px">загальний банк номінацій →</td>
+        <td class="pts-cell"></td>
+        <td class="r" style="color:var(--gold);font-weight:700;white-space:nowrap">${pot} ${code}</td>
+      </tr></tfoot>`;
+      return `<div style="margin-top:2rem">
+        <div class="sec-title" style="font-size:18px">${title}</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hintTxt}</p>
+        ${scrollHint}
+        <div class="${wrapCls}"><table class="lb-table">
+          <thead><tr><th>#</th><th>Учасник</th>${bhead}<th class="r">Очки</th><th class="r">Баланс</th></tr></thead>
+          <tbody>${body}</tbody>
+          ${foot}
+        </table></div></div>`;
+    }
     return `<div style="margin-top:2rem">
       <div class="sec-title" style="font-size:18px">${title}</div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">${hintTxt}</p>
@@ -6220,19 +6243,25 @@ function renderLeaderboard(){
       </table></div>
     </div>
     ${(()=>{
-      // ── Таблиця номінацій бонусного раунду ──────────────────────────
+      // ── Таблиця номінацій бонусного раунду (той самий алгоритм, що й у касі
+      // номінацій основного раунду): прапор+країна, бали при вгадуванні,
+      // вартість номінації в шапці, окрема каса (zero-sum) знизу. ──
       const noms=(S.nominations||[]);
       if(!noms.length)return '';
-      // Показуємо всіх бонус-учасників, що зробили бодай один вибір номінації.
       const rowsN=bonusParticipants
         .map(n=>({n, picks:((br.predictions[n]||{}).nominations)||{}}))
         .filter(r=>noms.some(nm=>r.picks[nm.id]));
       if(!rowsN.length)return '';
+      const bRate=(br.rate||1);
       const nomPtsOf=nm=>br.nomPts||nm.pts;
-      // Сортуємо за кількістю вгаданих бонус-номінацій.
-      rowsN.forEach(r=>{r.hit=noms.reduce((a,nm)=>a+(nm.winner&&r.picks[nm.id]===nm.winner?nomPtsOf(nm):0),0);});
+      // Бали за бонус-номінації для гравця (для сортування й zero-sum каси).
+      const bnomPts=picks=>noms.reduce((a,nm)=>a+(nm.winner&&picks[nm.id]===nm.winner?nomPtsOf(nm):0),0);
+      rowsN.forEach(r=>{r.hit=bnomPts(r.picks);});
       rowsN.sort((a,b)=>b.hit-a.hit);
-      const head=noms.map(nm=>`<th class="r" title="${escapeAttr(nm.name)} (${nomPtsOf(nm)} оч.)${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}</th>`).join('');
+      // Zero-sum каса бонус-номінацій: той самий allocator, що й скрізь.
+      const balMapN=calcAllBalances(rowsN.map(r=>({n:r.n,total:r.hit})), +bRate||1);
+      let potN=0; rowsN.forEach(r=>{const b=balMapN.get(r.n)||0; if(b>0)potN+=b;});
+      const head=noms.map(nm=>`<th class="r" title="${escapeAttr(nm.name)}${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}<br><span style="font-weight:400;color:var(--muted);font-size:9px">${nomPtsOf(nm)} оч.</span></th>`).join('');
       const bodyN=rowsN.map((r,i)=>{
         const rank=i+1,rc=rank===1?'gold-rank':rank===2?'silver-rank':rank===3?'bronze-rank':'';
         const cells=noms.map(nm=>{
@@ -6243,15 +6272,24 @@ function renderLeaderboard(){
           if(guessed)return `<td class="sub-cell" style="color:var(--green2);white-space:nowrap" title="Вгадано: +${nomPtsOf(nm)} оч.">${fl}${escapeHtml(pick)} <span style="font-size:10px">+${nomPtsOf(nm)}</span></td>`;
           return `<td class="sub-cell" style="white-space:nowrap">${fl}${escapeHtml(pick)}</td>`;
         }).join('');
-        return `<tr><td class="rank-cell ${rc}">${rank}</td><td class="name-cell">${escapeHtml(r.n)}</td>${cells}<td class="pts-cell">${r.hit}</td></tr>`;
+        const bal=balMapN.get(r.n)||0;
+        const balEl=bal>=0?`<td class="uah-pos">+${bal} ${bCode}</td>`:`<td class="uah-neg">${bal} ${bCode}</td>`;
+        return `<tr><td class="rank-cell ${rc}">${rank}</td><td class="name-cell">${escapeHtml(r.n)}</td>${cells}<td class="pts-cell">${r.hit}</td>${balEl}</tr>`;
       }).join('');
+      const footN=`<tfoot><tr style="border-top:2px solid var(--border2);font-weight:700">
+        <td></td><td class="name-cell">Каса</td>
+        <td class="sub-cell" colspan="${noms.length}" style="color:var(--muted);text-align:right;font-weight:400;font-size:11px">загальний банк номінацій →</td>
+        <td class="pts-cell"></td>
+        <td class="r" style="color:var(--gold);font-weight:700;white-space:nowrap">${potN} ${bCode}</td>
+      </tr></tfoot>`;
       return `<div style="margin-top:1.5rem">
         <div class="sec-title" style="font-size:16px">🏅 Номінації бонусного раунду</div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Прогнози країн на номінації · зелений = вгадано</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Прогнози країн на номінації · зелений = вгадано · окрема каса zero-sum</p>
         <div class="scen-hint">← гортайте вбік →</div>
         <div class="scen-wrap"><table class="lb-table">
-          <thead><tr><th>#</th><th>Учасник</th>${head}<th class="r">Очки</th></tr></thead>
+          <thead><tr><th>#</th><th>Учасник</th>${head}<th class="r">Очки</th><th class="r">Баланс</th></tr></thead>
           <tbody>${bodyN}</tbody>
+          ${footN}
         </table></div>
       </div>`;
     })()}`;

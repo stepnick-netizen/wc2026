@@ -75,7 +75,7 @@ nav{background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;
 .lb-table tr:hover td{background:rgba(255,255,255,.02);}
 /* Таблиця сценарію: природна ширина + горизонтальний скрол на вузьких екранах */
 .scen-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;}
-.scen-wrap .lb-table{width:auto;min-width:100%;}
+.scen-wrap .lb-table{width:auto;min-width:100%;border-collapse:separate;border-spacing:0;}
 .scen-wrap .lb-table th,.scen-wrap .lb-table td{white-space:nowrap;}
 /* Липкі перші дві колонки (# та Учасник), щоб було видно чий рядок при скролі */
 .scen-wrap .lb-table th:nth-child(1),.scen-wrap .lb-table td:nth-child(1){position:sticky;left:0;background:var(--card);z-index:2;}
@@ -5991,10 +5991,16 @@ function renderPoolTables(){
         bd=pc(d.poExact||0)+pc(d.poDiff||0)+pc(d.poResult||0)
           +pc(f.r32||0)+pc(f.r16||0)+pc(f.r8||0)+pc(f.r4||0)+pc(f.fin||0)+pc(f.champ||0);
       } else if(nomMode){
-        // Колонка на кожну номінацію: очки, якщо вгадано переможця (інакше ·).
+        // Колонка на кожну номінацію: прапор+назва обраної гравцем країни.
+        // Зелений = вгадав переможця (показуємо й бали), інакше звичайний колір,
+        // «·» якщо гравець нічого не обрав.
         bd=nomsList.map(nm=>{
-          const guessed=nm.winner&&row.noms[nm.id]===nm.winner;
-          return guessed?`<td class="sub-cell" style="color:var(--green2)">${nm.pts}</td>`:`<td class="sub-cell" style="color:var(--muted)">·</td>`;
+          const pick=row.noms[nm.id]||'';
+          if(!pick)return `<td class="sub-cell" style="color:var(--muted)">·</td>`;
+          const guessed=nm.winner&&pick===nm.winner;
+          const fl=flag(teamIso(pick));
+          if(guessed)return `<td class="sub-cell" style="color:var(--green2);white-space:nowrap" title="Вгадано: +${nm.pts} оч.">${fl}${escapeHtml(pick)} <span style="font-size:10px">+${nm.pts}</span></td>`;
+          return `<td class="sub-cell" style="white-space:nowrap">${fl}${escapeHtml(pick)}</td>`;
         }).join('');
       } else if(breakdown){
         const d=row.det;
@@ -6212,7 +6218,43 @@ function renderLeaderboard(){
           </tr>`;
         }).join('')}</tbody>
       </table></div>
-    </div>`;
+    </div>
+    ${(()=>{
+      // ── Таблиця номінацій бонусного раунду ──────────────────────────
+      const noms=(S.nominations||[]);
+      if(!noms.length)return '';
+      // Показуємо всіх бонус-учасників, що зробили бодай один вибір номінації.
+      const rowsN=bonusParticipants
+        .map(n=>({n, picks:((br.predictions[n]||{}).nominations)||{}}))
+        .filter(r=>noms.some(nm=>r.picks[nm.id]));
+      if(!rowsN.length)return '';
+      const nomPtsOf=nm=>br.nomPts||nm.pts;
+      // Сортуємо за кількістю вгаданих бонус-номінацій.
+      rowsN.forEach(r=>{r.hit=noms.reduce((a,nm)=>a+(nm.winner&&r.picks[nm.id]===nm.winner?nomPtsOf(nm):0),0);});
+      rowsN.sort((a,b)=>b.hit-a.hit);
+      const head=noms.map(nm=>`<th class="r" title="${escapeAttr(nm.name)} (${nomPtsOf(nm)} оч.)${nm.winner?' · переможець: '+escapeAttr(nm.winner):''}">${escapeHtml(nm.name)}</th>`).join('');
+      const bodyN=rowsN.map((r,i)=>{
+        const rank=i+1,rc=rank===1?'gold-rank':rank===2?'silver-rank':rank===3?'bronze-rank':'';
+        const cells=noms.map(nm=>{
+          const pick=r.picks[nm.id]||'';
+          if(!pick)return `<td class="sub-cell" style="color:var(--muted)">·</td>`;
+          const guessed=nm.winner&&pick===nm.winner;
+          const fl=flag(teamIso(pick));
+          if(guessed)return `<td class="sub-cell" style="color:var(--green2);white-space:nowrap" title="Вгадано: +${nomPtsOf(nm)} оч.">${fl}${escapeHtml(pick)} <span style="font-size:10px">+${nomPtsOf(nm)}</span></td>`;
+          return `<td class="sub-cell" style="white-space:nowrap">${fl}${escapeHtml(pick)}</td>`;
+        }).join('');
+        return `<tr><td class="rank-cell ${rc}">${rank}</td><td class="name-cell">${escapeHtml(r.n)}</td>${cells}<td class="pts-cell">${r.hit}</td></tr>`;
+      }).join('');
+      return `<div style="margin-top:1.5rem">
+        <div class="sec-title" style="font-size:16px">🏅 Номінації бонусного раунду</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:.5rem">Прогнози країн на номінації · зелений = вгадано</p>
+        <div class="scen-hint">← гортайте вбік →</div>
+        <div class="scen-wrap"><table class="lb-table">
+          <thead><tr><th>#</th><th>Учасник</th>${head}<th class="r">Очки</th></tr></thead>
+          <tbody>${bodyN}</tbody>
+        </table></div>
+      </div>`;
+    })()}`;
 
   // Стара таблиця «Загальний підсумок» прибрана — її замінює зведена таблиця
   // по касах зверху сторінки (renderSummaryTable) з коректними касовими балансами.

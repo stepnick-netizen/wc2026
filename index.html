@@ -1420,19 +1420,41 @@ function calcDetailedPts(name){
   let bonusPts=0,bExact=0,bResult=0,bDiff=0,bScorePts=0,bR32=0,bR16=0,bR8=0,bR4=0,bFin=0,bChamp=0,bNom=0;
   if(S.bonusRound?.active){
     const br=S.bonusRound,bpred=br.predictions[name]||{},bpm=bpred.matches||{};
-    // Match scores for bonus rounds (1/8 onward) — compare vs real bracket results
+    // Match scores for bonus rounds (1/8 onward) — compare vs real bracket results.
+    // ПАРА МАЄ БУТИ ВГАДАНА ТОЧНО (як в основному турнірі): рахунок зараховується
+    // лише якщо реальна пара цього слота присутня у бонусній сітці гравця. Інакше 0
+    // (анти-паразит). 1/16 (b_r32) має реальні пари, тож завжди звіряється коректно.
+    const bPredSlots=getBonusPredSlots(bpred);
+    const isRealTeamNameB=t=>t&&!String(t).startsWith('Матч')&&!String(t).startsWith('Пер.')&&!String(t).startsWith('Переможець')&&!String(t).startsWith('TBD')&&t!=='Команда B'&&t!=='—';
     PLAYOFF_ROUNDS.forEach(round=>{
       if(round.id==='third')return; // у бонусі немає матчу за 3-тє
-      // ── РАХУНКИ матчів: рахуються з 1/16 (b_r32) і далі ──
+      const predSlots=bPredSlots[round.id]||[];
+      // ── РАХУНКИ матчів: 1/16 і далі, ЛИШЕ зі звіркою пари ──
       for(let i=0;i<round.n;i++){
-        const mid=`b_${round.id}_${i}`;
-        const p=bpm[mid];
-        if(!p||p.h===''||p.h===undefined)continue;
-        // Real result: use actual S.matches for this round/match
         const realMid=`${round.id}_${i}`;
-        const res=S.matches[realMid]||(br.results||{})[mid];
+        const res=S.matches[realMid]||(br.results||{})[`b_${round.id}_${i}`];
         if(!res||res.h===''||res.h===undefined)continue;
-        const sc=scoreMatch(+res.h,+res.a,+p.h,+p.a,{exact:br.ptsScore,result:br.ptsResult,diff:br.ptsDiff||0});
+        // реальна пара цього слота (адмінські playoffSlots → фолбек на деривовану сітку)
+        const rslot=(S.playoffSlots||{})[realMid]||{};
+        let realHome=rslot.home||'', realAway=rslot.away||'';
+        if(!realHome||!realAway){
+          try{const rs=getRealSlotsForRound(round.id); const s=rs&&rs[i]; if(s){realHome=realHome||s.home||''; realAway=realAway||s.away||'';}}catch(e){}
+        }
+        if(!isRealTeamNameB(realHome)||!isRealTeamNameB(realAway))continue;
+        // шукаємо реальну пару в бонусній сітці гравця (будь-який слот раунду, будь-яка орієнтація)
+        let predIdx=-1;
+        for(let j=0;j<predSlots.length;j++){
+          const ps=predSlots[j]; if(!ps)continue;
+          if(ps.home===realHome&&ps.away===realAway){predIdx=j;break;}
+          if(ps.home===realAway&&ps.away===realHome){predIdx=j;break;}
+        }
+        if(predIdx===-1)continue; // пара не збіглась → 0 балів
+        const p=bpm[`b_${round.id}_${predIdx}`];
+        if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)continue;
+        // перемапити голи прогнозу на реальні хазяїн/гість
+        const predHome=predSlots[predIdx].home;
+        let pH,pA; if(predHome===realHome){pH=+p.h;pA=+p.a;}else{pH=+p.a;pA=+p.h;}
+        const sc=scoreMatch(+res.h,+res.a,pH,pA,{exact:br.ptsScore,result:br.ptsResult,diff:br.ptsDiff||0});
         // Взаємовиключно: рахунок АБО різниця АБО результат (макс. одна категорія)
         const onePts = sc.exact ? sc.exact : (sc.diff ? sc.diff : sc.result);
         bonusPts+=onePts;
@@ -2888,6 +2910,33 @@ function getPredSlotsForRound(roundId, pred){
     return [{id:'third_0',n:1,home:loser1,away:loser2}];
   }
   return[];
+}
+
+// Бонусна сітка гравця по раундах (пари, які він фактично вивів).
+// База — реальні пари 1/16 (getRealR32Slots), далі просування за його рахунками
+// b_r32/b_r16/b_r8/b_r4 (та сама логіка, що при збереженні бонус-прогнозу).
+// Використовується для звірки пари у бонусному скорингу та в Live.
+function getBonusPredSlots(bpred){
+  const bpm=(bpred&&bpred.matches)||{};
+  const qw=(mid,home,away)=>{
+    const m=bpm[mid];
+    if(!m||m.h===''||m.h===undefined||m.a===''||m.a===undefined)return null;
+    if(+m.h>+m.a)return home;
+    if(+m.a>+m.h)return away;
+    return m.winner||null;
+  };
+  let r32=[];
+  try{r32=getRealR32Slots()||[];}catch(e){r32=[];}
+  const r32slots=r32.map(s=>({home:s.home||'',away:s.away||''}));
+  const r16w=r32slots.map((s,i)=>qw(`b_r32_${i}`,s.home,s.away));
+  const r16slots=[]; for(let i=0;i<8;i++)r16slots.push({home:r16w[i*2]||'',away:r16w[i*2+1]||''});
+  const r8w=r16slots.map((s,i)=>(s.home&&s.away)?qw(`b_r16_${i}`,s.home,s.away):null);
+  const r8slots=[]; for(let i=0;i<4;i++)r8slots.push({home:r8w[i*2]||'',away:r8w[i*2+1]||''});
+  const r4w=r8slots.map((s,i)=>(s.home&&s.away)?qw(`b_r8_${i}`,s.home,s.away):null);
+  const r4slots=[]; for(let i=0;i<2;i++)r4slots.push({home:r4w[i*2]||'',away:r4w[i*2+1]||''});
+  const finw=r4slots.map((s,i)=>(s.home&&s.away)?qw(`b_r4_${i}`,s.home,s.away):null);
+  const finalslots=[{home:finw[0]||'',away:finw[1]||''}];
+  return {r32:r32slots, r16:r16slots, r8:r8slots, r4:r4slots, final:finalslots};
 }
 
 // ── RENDER PREDICT ──────────────────────────────────────────────
@@ -5795,176 +5844,6 @@ function renderAwards(){
       value:`На ${mostUnderrated[1].toFixed(1)} раунди далі прогнозу`,color:'var(--gold)'});
   }
 
-  // ══════════════════════════════════════════════════════════════
-  // МАТАН-РОК — нові математичні номінації (лише груповий етап)
-  // ══════════════════════════════════════════════════════════════
-  // Хронологія за туром (matchday), а не за алфавітом груп.
-  const MD_OF_K={0:1,1:2,2:3,3:3,4:2,5:1};
-  const seqMatches=[...played].sort((a,b)=>
-    (MD_OF_K[a.k]-MD_OF_K[b.k]) || (a.g<b.g?-1:a.g>b.g?1:0) || (a.k-b.k));
-
-  // Розширена статистика по матчу: хто скільки набрав + модальний рахунок.
-  const mx={};
-  played.forEach(m=>{
-    const res=getRes(m.id); if(!res)return;
-    const rH=+res.h,rA=+res.a;
-    const byName={}; let N=0,hitCount=0,sumPts=0; const freq={};
-    S.participants.forEach(name=>{
-      const p=getPred(name,m.id);
-      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
-      const pH=+p.h,pA=+p.a;
-      const sc=scoreMatch(rH,rA,pH,pA,S.scoring);
-      const pts=sc.exact+sc.result+sc.diff;
-      byName[name]={pts,hit:pts>0,exact:!!sc.exact,ph:pH,pa:pA};
-      N++; if(pts>0)hitCount++; sumPts+=pts;
-      const key=pH+':'+pA; freq[key]=(freq[key]||0)+1;
-    });
-    let modeKey=null,modeCount=0;
-    Object.keys(freq).forEach(k=>{if(freq[k]>modeCount){modeCount=freq[k];modeKey=k;}});
-    mx[m.id]={rH,rA,N,hitCount,sumPts,byName,modeKey};
-  });
-  const allGm=allGroupMatches();
-
-  // ── Чисті математичні хелпери ──
-  const _log2=x=>Math.log(x)/Math.LN2;
-  const _mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
-  function _pearson(xs,ys){
-    const n=xs.length; if(n<2)return null;
-    const mX=_mean(xs),mY=_mean(ys); let sxy=0,sxx=0,syy=0;
-    for(let i=0;i<n;i++){const dx=xs[i]-mX,dy=ys[i]-mY;sxy+=dx*dy;sxx+=dx*dx;syy+=dy*dy;}
-    if(sxx===0||syy===0)return null;
-    return sxy/Math.sqrt(sxx*syy);
-  }
-  function _slope(ys){
-    const n=ys.length; if(n<2)return null;
-    const mX=(n-1)/2,mY=_mean(ys); let sxy=0,sxx=0;
-    for(let i=0;i<n;i++){const dx=i-mX;sxy+=dx*(ys[i]-mY);sxx+=dx*dx;}
-    if(sxx===0)return null;
-    return sxy/sxx;
-  }
-  function _entropy(counts){
-    const tot=counts.reduce((s,c)=>s+c,0); if(tot===0)return 0;
-    let h=0; counts.forEach(c=>{if(c>0){const p=c/tot;h-=p*_log2(p);}});
-    return h;
-  }
-  function _wilsonLB(hits,n){
-    if(n===0)return 0;
-    const z=1.96,p=hits/n,denom=1+z*z/n;
-    const centre=p+z*z/(2*n);
-    const margin=z*Math.sqrt((p*(1-p)+z*z/(4*n))/n);
-    return (centre-margin)/denom;
-  }
-  const _longestRun=(arr,val)=>{let best=0,cur=0;arr.forEach(x=>{if(x===val){cur++;if(cur>best)best=cur;}else cur=0;});return best;};
-
-  const MINQ=Math.max(3, Math.ceil(playedCount*0.25));
-  const pickW=(rows,dir)=>{
-    if(!rows.length)return null;
-    let best=rows[0].val;
-    rows.forEach(r=>{if(dir==='max'?r.val>best:r.val<best)best=r.val;});
-    return {names:rows.filter(r=>r.val===best).map(r=>r.n), val:best};
-  };
-
-  // ── Метрики по кожному учаснику ──
-  const M={};
-  S.participants.forEach(name=>{
-    const seqPts=[]; const dPred=[],dReal=[]; const absErr=[];
-    let exactHits=0,nPred=0, actual=0,expected=0,expN=0, solo=0, consM=0,consT=0;
-    seqMatches.forEach(m=>{
-      const cell=mx[m.id]; if(!cell)return;
-      const me=cell.byName[name]; if(!me)return;
-      seqPts.push(me.pts); nPred++; if(me.exact)exactHits++;
-      absErr.push(Math.abs((me.ph+me.pa)-(cell.rH+cell.rA)));
-      dPred.push(me.ph-me.pa); dReal.push(cell.rH-cell.rA);
-      if(me.hit && cell.N>=2 && cell.hitCount>0) solo += me.pts * (-_log2(cell.hitCount/cell.N));
-      if(cell.N>=2){ const othersMean=(cell.sumPts-me.pts)/(cell.N-1); actual+=me.pts; expected+=othersMean; expN++; }
-      if(cell.modeKey){ consT++; if((me.ph+':'+me.pa)===cell.modeKey)consM++; }
-    });
-    const styleFreq={};
-    allGm.forEach(m=>{
-      const p=getPred(name,m.id);
-      if(!p||p.h===''||p.h===undefined||p.a===''||p.a===undefined)return;
-      const k=(+p.h)+':'+(+p.a); styleFreq[k]=(styleFreq[k]||0)+1;
-    });
-    const styleCounts=Object.values(styleFreq);
-    const styleTot=styleCounts.reduce((s,c)=>s+c,0);
-    let styleTop=null;
-    if(styleTot){let bk=null,bc=0;Object.keys(styleFreq).forEach(k=>{if(styleFreq[k]>bc){bc=styleFreq[k];bk=k;}});styleTop={k:bk,share:Math.round(100*bc/styleTot)};}
-    const bits=seqPts.map(p=>p>0?1:0);
-    M[name]={
-      nPred, exactHits, styleTop,
-      hotRun:_longestRun(bits,1), coldRun:_longestRun(bits,0),
-      slope: seqPts.length>=Math.max(4,MINQ)? _slope(seqPts): null,
-      mae: absErr.length>=MINQ? _mean(absErr): null,
-      corr: dPred.length>=MINQ? _pearson(dPred,dReal): null,
-      wilson: nPred>0? _wilsonLB(exactHits,nPred): null,
-      hitRate: nPred>0? exactHits/nPred: 0,
-      entropy: styleTot>=Math.max(6,MINQ)? _entropy(styleCounts): null,
-      solo, overExp: expN>0? (actual-expected): null,
-      consensus: consT>=MINQ? consM/consT: null
-    };
-  });
-
-  const rock=[];
-  const rowsOf=sel=>S.participants.map(n=>({n,val:sel(M[n])})).filter(r=>r.val!==null&&r.val!==undefined&&!Number.isNaN(r.val));
-
-  { const w=pickW(rowsOf(m=>m.solo>0?m.solo:null),'max');
-    if(w) rock.push({icon:'🐺',title:'Соло-снайпер',
-      desc:'Влучення важить тим більше, чим менше людей вгадали цей матч (вага = −log₂ частки тих, хто теж влучив). Правота, коли решта помилялась.',
-      winner:joinNames(w.names),value:`${w.val.toFixed(1)} балів рідкості`,color:'var(--gold)'}); }
-
-  { const w=pickW(rowsOf(m=>m.consensus),'max');
-    if(w) rock.push({icon:'🐑',title:'Дзеркало натовпу',
-      desc:'Частка матчів, де рахунок гравця збігся з найпопулярнішим (модальним) прогнозом. Хто грає «як усі».',
-      winner:joinNames(w.names),value:`${Math.round(w.val*100)}% збігів із модою`,color:'var(--muted)'}); }
-
-  { const w=pickW(rowsOf(m=>m.mae),'min');
-    if(w) rock.push({icon:'🎯',title:'Точний приціл',
-      desc:'Найменша середня похибка за сумою голів матчу |прогноз − факт|. Можна стабільно бути «поруч» без жодного точного рахунку.',
-      winner:joinNames(w.names),value:`${w.val.toFixed(2)} гола середня похибка`,color:'var(--green2)'}); }
-
-  { const w=pickW(rowsOf(m=>m.corr),'max');
-    if(w&&w.val>0) rock.push({icon:'📈',title:'Відчуття матчу',
-      desc:'Кореляція Пірсона між прогнозованою і реальною різницею голів (h−a). Хто відчуває, на чиєму боці перевага — навіть не в точний рахунок.',
-      winner:joinNames(w.names),value:`r = ${w.val.toFixed(2)}`,color:'var(--blue3)'}); }
-
-  { const w=pickW(rowsOf(m=>m.hotRun>0?m.hotRun:null),'max');
-    if(w&&w.val>=2) rock.push({icon:'🔥',title:'Гаряча рука',
-      desc:'Найдовша серія матчів поспіль (у порядку турів) з ≥1 набраним очком. Класична «hot hand».',
-      winner:joinNames(w.names),value:`${w.val} матчів поспіль у плюсі`,color:'#ff9f43'}); }
-
-  { const w=pickW(rowsOf(m=>m.coldRun>0?m.coldRun:null),'max');
-    if(w&&w.val>=2) rock.push({icon:'🧊',title:'Крижаний душ',
-      desc:'Найдовша серія матчів поспіль без жодного очка. Антипод гарячої руки.',
-      winner:joinNames(w.names),value:`${w.val} матчів поспіль у нулі`,color:'var(--blue3)'}); }
-
-  { const w=pickW(rowsOf(m=>m.slope),'max');
-    if(w&&w.val>0) rock.push({icon:'🚀',title:'На підйомі',
-      desc:'Нахил лінії тренду очок-за-матч по ходу турів (лінійна регресія). Хто розігрався до кінця групового етапу.',
-      winner:joinNames(w.names),value:`нахил +${w.val.toFixed(2)} оч./матч`,color:'var(--green2)'}); }
-
-  { const w=pickW(rowsOf(m=>m.wilson),'max');
-    if(w&&w.val>0){ const nm=w.names[0];
-      rock.push({icon:'🎓',title:'Влучність',
-      desc:'Частка точних рахунків, згладжена нижньою межею Вілсона: мала вибірка карається, тож «1 з 1» не переможе «8 з 20».',
-      winner:joinNames(w.names),
-      value:`${M[nm].exactHits}/${M[nm].nPred} точних · ${Math.round(M[nm].hitRate*100)}%`,color:'var(--gold)'}); } }
-
-  { const w=pickW(rowsOf(m=>m.entropy),'max');
-    if(w) rock.push({icon:'🌈',title:'Різнобарв\'я',
-      desc:'Ентропія Шеннона розкиду рахунків у прогнозах (у бітах): що різноманітніші рахунки — то вище. Хто не боїться екзотики.',
-      winner:joinNames(w.names),value:`H = ${w.val.toFixed(2)} біт`,color:'#a06bff'}); }
-
-  { const w=pickW(rowsOf(m=>m.entropy),'min');
-    if(w){ const nm=w.names[0],st=M[nm].styleTop;
-      rock.push({icon:'🎵',title:'Однієї ноти',
-      desc:'Найнижча ентропія рахунків: майже завжди той самий улюблений рахунок. Мінімалізм як стиль.',
-      winner:joinNames(w.names),value:st?`H = ${w.val.toFixed(2)} біт · ${st.share}% рахунку ${st.k}`:`H = ${w.val.toFixed(2)} біт`,color:'var(--muted)'}); } }
-
-  { const w=pickW(rowsOf(m=>m.overExp),'max');
-    if(w&&w.val>0) rock.push({icon:'🍀',title:'Над очікування',
-      desc:'Набрані очки мінус «очікувані» — середні очки решти учасників на тих самих матчах. Додатній залишок = переграв поле (майстерність чи фарт).',
-      winner:joinNames(w.names),value:`+${w.val.toFixed(1)} оч. над полем`,color:'var(--gold)'}); }
-
   // ── Render ──
   let html2=`<div style="margin-bottom:1.5rem;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
     <div style="font-size:13px;color:var(--muted)">Зіграно матчів</div>
@@ -5974,7 +5853,6 @@ function renderAwards(){
     <div style="font-size:11px;color:var(--muted);margin-left:auto">Оновлюється після кожного матчу</div>
   </div>`;
 
-  html2+=`<div class="sec-title" style="font-size:20px;margin-top:.25rem">Номінації групового раунду</div>`;
   html2+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">`;
   awards.forEach(a=>{
     const isFeatured=a.featured;
@@ -5998,28 +5876,6 @@ function renderAwards(){
     </div>`;
   });
   html2+=`</div>`;
-
-  // ── МАТАН-РОК блок ──
-  if(rock.length){
-    html2+=`<div style="margin-top:2.25rem;margin-bottom:.75rem;padding:.65rem .95rem;border-left:4px solid #ff2d55;background:linear-gradient(90deg,rgba(255,45,85,.10),transparent);border-radius:0 8px 8px 0">
-      <div style="font-family:'Bebas Neue';font-size:26px;letter-spacing:2px;color:#fff">🤘 МАТАН-РОК</div>
-      <div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:2px">аналітика на повній гучності — рідкість влучень, точність, серії, тренд і фарт</div>
-    </div>`;
-    html2+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">`;
-    rock.forEach(a=>{
-      const body=`<div style="font-size:15px;font-weight:700;color:${a.color};margin-bottom:3px">${a.winner}</div>
-        ${a.value?`<div style="font-size:12px;color:var(--muted)">${a.value}</div>`:''}`;
-      html2+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;position:relative;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:#ff2d55;opacity:.55"></div>
-        <div style="font-size:28px;margin-bottom:.5rem">${a.icon}</div>
-        <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:#fff;margin-bottom:3px">${a.title}</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:.75rem;line-height:1.5">${a.desc}</div>
-        ${body}
-      </div>`;
-    });
-    html2+=`</div>`;
-  }
-
 
   // ── Особиста статистика ──
   html2+=`<div style="margin-top:2rem"><div class="sec-title" style="font-size:20px">Особиста статистика</div>
@@ -6890,6 +6746,33 @@ function renderLive(){
     }
     function bonusPredFor(n){
       if(!bonusOn)return null;
+      const bpred=(S.bonusRound.predictions||{})[n]||{};
+      const bpm=bpred.matches||{};
+      const bp=bpm[bKey];
+      if(!bp||bp.h===''||bp.h===undefined||bp.a===''||bp.a===undefined)return null;
+      if(info.stage!=='playoff')return {h:+bp.h,a:+bp.a};
+      // playoff: показуємо бонус-прогноз лише якщо реальна пара є в бонусній сітці гравця
+      // (та сама звірка, що у скорингу) — інакше — (пара не вгадана).
+      const realHome=(info.home&&info.home.n)||'', realAway=(info.away&&info.away.n)||'';
+      if(!realHome||!realAway)return {h:+bp.h,a:+bp.a};
+      try{
+        const ps=getBonusPredSlots(bpred)[info.round]||[];
+        let idx=-1,swap=false;
+        for(let j=0;j<ps.length;j++){
+          if(!ps[j])continue;
+          if(ps[j].home===realHome&&ps[j].away===realAway){idx=j;swap=false;break;}
+          if(ps[j].home===realAway&&ps[j].away===realHome){idx=j;swap=true;break;}
+        }
+        if(idx===-1)return null; // пара не збіглась
+        const q=bpm[`b_${info.round}_${idx}`];
+        if(!q||q.h===''||q.h===undefined||q.a===''||q.a===undefined)return null;
+        return swap?{h:+q.a,a:+q.h}:{h:+q.h,a:+q.a};
+      }catch(e){ return {h:+bp.h,a:+bp.a}; }
+    }
+    // Сирий бонус-стейк на цей слот (незалежно від звірки пари) — для участі в касі
+    // як zero-гравець (зробив прогноз, але пара не збіглась → 0 за матч, але в zero-sum).
+    function bonusRawFor(n){
+      if(!bonusOn)return null;
       const bp=(((S.bonusRound.predictions||{})[n]||{}).matches||{})[bKey];
       if(!bp||bp.h===''||bp.h===undefined||bp.a===''||bp.a===undefined)return null;
       return {h:+bp.h,a:+bp.a};
@@ -6913,8 +6796,9 @@ function renderLive(){
       const bonus=bonusPredFor(n);
       const baseStaked=hasBaseStake(n);
       const baseRaw=baseRawFor(n);
-      // Залишаємо всіх, хто брав участь хоч у якійсь касі (base/bonus прогноз або сам факт ставки base)
-      if(base||bonus||baseStaked)rows.push({n, base, bonus, baseStaked, baseRaw});
+      const bonusRaw=bonusRawFor(n);
+      // Залишаємо всіх, хто брав участь хоч у якійсь касі (base/bonus прогноз або факт ставки)
+      if(base||bonus||baseStaked||bonusRaw)rows.push({n, base, bonus, baseStaked, baseRaw, bonusRaw});
     });
 
     // Підсвітка влучень
@@ -6953,7 +6837,9 @@ function renderLive(){
       //   Хто вгадав пару → грає своїм рахунком. Хто не вгадав пару → zero=true
       //   (за офіційними правилами за цей матч отримує 0, але бере участь у zero-sum).
       const baseList=rows.filter(r=>r.baseRaw).map(r=>({n:r.n,h:r.baseRaw.h,a:r.baseRaw.a,zero:!r.base}));
-      const bonusList=rows.filter(r=>r.bonus).map(r=>({n:r.n,h:r.bonus.h,a:r.bonus.a}));
+      const bonusList=rows.filter(r=>r.bonus||r.bonusRaw).map(r=> r.bonus
+        ? {n:r.n,h:r.bonus.h,a:r.bonus.a,zero:false}
+        : {n:r.n,h:r.bonusRaw.h,a:r.bonusRaw.a,zero:true});
       const br=S.bonusRound||{};
       const bonusSco={exact:br.ptsScore||3, result:br.ptsResult||1, diff:br.ptsDiff||0, excl:true};
       const econBase=liveMatchEconomics(baseList, rate, nowR, S.scoring);
@@ -7014,12 +6900,13 @@ function renderLive(){
         html+='<div style="display:grid;grid-template-columns:1fr 110px 110px;gap:0;align-items:center;padding:.45rem 1rem;border-bottom:1px solid var(--border)">';
         html+='<span style="font-size:14px;font-weight:600">'+escapeHtml(r.n)+(hasDetail?' <span style="color:var(--muted);font-size:11px">▾</span>':'')+'</span>';
         html+='<span style="text-align:center">'+poolCell(r.base, eB, baseEmpty)+'</span>';
-        html+='<span style="text-align:center">'+poolCell(r.bonus, eN, 'cross')+'</span>';
+        const bonusEmpty=r.bonusRaw?'dash':'cross';
+        html+='<span style="text-align:center">'+poolCell(r.bonus, eN, bonusEmpty)+'</span>';
         html+='</div>';
         if(hasDetail){
           html+='<div class="le-detail2" style="padding:.5rem 1rem .7rem;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;line-height:1.6">';
           html+=poolDetail('📅 До турніру', r.base, eB, r.baseRaw&&!r.base);
-          html+=poolDetail('🎯 Бонус', r.bonus, eN, false);
+          html+=poolDetail('🎯 Бонус', r.bonus, eN, r.bonusRaw&&!r.bonus);
           html+='</div>';
         }
         html+='</div>';
@@ -8462,6 +8349,38 @@ function runTests() {
     if (r1) return r1;
     return expect(half.matchPts===0,
       `Напівзаповнений (1:) НЕ має давати балів, отримано ${half.matchPts}`);
+  });
+
+  // ── Test 14 ────────────────────────────────────────────────────────
+  // Бонус: бали за РАХУНОК плей-оф нараховуються лише коли ПАРА вгадана точно
+  // (анти-паразит, симетрично до основного турніру). ЛОВИТЬ БАГ, який помітив Микола:
+  // прогноз на слот, де в гравця інша пара, не має зараховуватись проти реального матчу.
+  test('14. Бонус — рахунок плей-оф лише при вгаданій парі', () => {
+    S = baseState();
+    const _origR32 = getRealR32Slots;
+    // Стаб реальних пар 1/16: Іспанія у слоті0, Бельгія у слоті2 (одна чвертка сітки).
+    const T=['Іспанія','X0','A1','B1','Бельгія','X2','A3','B3','C0','C1','C2','C3','D1','D2','E1','E2',
+             'F1','F2','G1','G2','H1','H2','I1','I2','J1','J2','K1','K2','L1','L2','M1','M2'];
+    getRealR32Slots = function(){ const r=[]; for(let i=0;i<16;i++)r.push({id:'r32_'+i,n:i+1,home:T[i*2],away:T[i*2+1]}); return r; };
+    try {
+      const allHome = () => { const m={}; for(let i=0;i<16;i++)m['b_r32_'+i]={h:2,a:0};
+        for(let i=0;i<8;i++)m['b_r16_'+i]={h:2,a:0}; for(let i=0;i<4;i++)m['b_r8_'+i]={h:1,a:1}; return m; };
+      // Добрий: all-home → 1/4 слот0 = Іспанія vs Бельгія; ставить точний 2:1.
+      const good = allHome(); good['b_r8_0']={h:2,a:1};
+      // Микола: у b_r32_2 проходить X2 замість Бельгії → 1/4 слот0 = Іспанія vs X2; ставить 3:1.
+      const mik = allHome(); mik['b_r32_2']={h:0,a:2}; mik['b_r8_0']={h:3,a:1};
+      S.playoffSlots = {'r8_0':{home:'Іспанія',away:'Бельгія'}};
+      S.matches = {'r8_0':{h:2,a:1}};                 // реальний 1/4: Іспанія 2:1 Бельгія
+      S.participants = ['Микола','Добрий'];
+      S.bonusRound = {active:true, ptsScore:3, ptsResult:1, ptsDiff:2, rate:1,
+        predictions:{ 'Микола':{matches:mik,playoffs:{},nominations:{}},
+                      'Добрий':{matches:good,playoffs:{},nominations:{}} }};
+      const bMik = calcPts('Микола').bonusDetail.bScorePts;
+      const bGood = calcPts('Добрий').bonusDetail.bScorePts;
+      const r1 = expect(bMik===0, `Микола не вгадав пару Іспанія-Бельгія → 0 бонус-балів, отримав ${bMik}`);
+      if (r1) return r1;
+      return expect(bGood===3, `Добрий вгадав пару + точний 2:1 → 3 бонус-бали, отримав ${bGood}`);
+    } finally { getRealR32Slots = _origR32; }
   });
 
   // ── RENDER RESULTS ─────────────────────────────────────────────────

@@ -1427,7 +1427,8 @@ function calcDetailedPts(name){
     const bPredSlots=getBonusPredSlots(bpred);
     const isRealTeamNameB=t=>t&&!String(t).startsWith('Матч')&&!String(t).startsWith('Пер.')&&!String(t).startsWith('Переможець')&&!String(t).startsWith('TBD')&&t!=='Команда B'&&t!=='—';
     PLAYOFF_ROUNDS.forEach(round=>{
-      if(round.id==='third')return; // у бонусі немає матчу за 3-тє
+      // Матч за 3-є місце У БОНУСІ Є (картка b_third_0): рахунок зараховується
+      // нижче, а командних балів за прохід у нього немає (див. return перед ними).
       const predSlots=bPredSlots[round.id]||[];
       // ── РАХУНКИ матчів: 1/16 і далі, ЛИШЕ зі звіркою пари ──
       for(let i=0;i<round.n;i++){
@@ -1461,8 +1462,9 @@ function calcDetailedPts(name){
         bScorePts+=onePts;
         if(sc.exact)bExact++; else if(sc.diff)bDiff++; else if(sc.result)bResult++;
       }
-      // ── КОМАНДНІ бали (прохід команди): стартують з 1/8 (r16). Для 1/16 їх немає ──
-      if(round.id==='r32'){return;}
+      // ── КОМАНДНІ бали (прохід команди): стартують з 1/8 (r16). Для 1/16 їх немає.
+      // Матч за 3-є місце — теж немає (це не прохід далі, лише рахунок вище). ──
+      if(round.id==='r32'||round.id==='third'){return;}
       const pTeams=(bpred.playoffs||{})[round.id]||[];
       // Derive real advanced teams from actual bracket results automatically
       const getRealAdvanced=(roundId)=>{
@@ -2936,7 +2938,22 @@ function getBonusPredSlots(bpred){
   const r4slots=[]; for(let i=0;i<2;i++)r4slots.push({home:r4w[i*2]||'',away:r4w[i*2+1]||''});
   const finw=r4slots.map((s,i)=>(s.home&&s.away)?qw(`b_r4_${i}`,s.home,s.away):null);
   const finalslots=[{home:finw[0]||'',away:finw[1]||''}];
-  return {r32:r32slots, r16:r16slots, r8:r8slots, r4:r4slots, final:finalslots};
+  // Матч за 3-є місце — переможені півфіналів (b_r4_0 / b_r4_1). Бонусна форма
+  // дає картку 'b_third_0', сітка його показує, тож і звірка пари має його знати.
+  const ql=(mid,home,away)=>{
+    if(!home||!away)return '';
+    const m=bpm[mid];
+    if(!m||m.h===''||m.h===undefined||m.a===''||m.a===undefined)return '';
+    if(+m.h>+m.a)return away;   // виграв home → програв away
+    if(+m.a>+m.h)return home;
+    const w=m.winner||'';
+    if(w===home)return away;
+    if(w===away)return home;
+    return '';
+  };
+  const thirdslots=[{home:ql('b_r4_0',r4slots[0]&&r4slots[0].home,r4slots[0]&&r4slots[0].away),
+                     away:ql('b_r4_1',r4slots[1]&&r4slots[1].home,r4slots[1]&&r4slots[1].away)}];
+  return {r32:r32slots, r16:r16slots, r8:r8slots, r4:r4slots, final:finalslots, third:thirdslots};
 }
 
 // ── RENDER PREDICT ──────────────────────────────────────────────
@@ -8380,6 +8397,48 @@ function runTests() {
       const r1 = expect(bMik===0, `Микола не вгадав пару Іспанія-Бельгія → 0 бонус-балів, отримав ${bMik}`);
       if (r1) return r1;
       return expect(bGood===3, `Добрий вгадав пару + точний 2:1 → 3 бонус-бали, отримав ${bGood}`);
+    } finally { getRealR32Slots = _origR32; }
+  });
+
+  // ── Test 15 ────────────────────────────────────────────────────────
+  // Бонус: матч за 3-є місце (b_third_0) МАЄ рахуватись і мати пару в сітці.
+  // ЛОВИТЬ БАГ: getBonusPredSlots не повертав ключ 'third' (Live показував «—»),
+  // а calcPts пропускав раунд 'third' узагалі (бали ніколи не нараховувались).
+  test('15. Бонус — матч за 3-є місце рахується при вгаданій парі', () => {
+    S = baseState();
+    const _origR32 = getRealR32Slots;
+    // Півфіналісти при «home завжди перемагає» = home-команди r32-слотів 0,4,8,12,
+    // тобто позиції 0, 8, 16, 24 у пласкому списку команд.
+    const T=['Франція','a1','a2','a3','a4','a5','a6','a7',
+             'Іспанія','b1','b2','b3','b4','b5','b6','b7',
+             'Англія','c1','c2','c3','c4','c5','c6','c7',
+             'Аргентина','d1','d2','d3','d4','d5','d6','d7'];
+    getRealR32Slots = function(){ const r=[]; for(let i=0;i<16;i++)r.push({id:'r32_'+i,n:i+1,home:T[i*2],away:T[i*2+1]}); return r; };
+    try {
+      // «home завжди перемагає» → 1/2: слот0 = Франція vs Іспанія, слот1 = Англія vs Аргентина
+      const mk=()=>{const m={};for(let i=0;i<16;i++)m['b_r32_'+i]={h:2,a:0};
+        for(let i=0;i<8;i++)m['b_r16_'+i]={h:2,a:0}; for(let i=0;i<4;i++)m['b_r8_'+i]={h:2,a:0}; return m;};
+      // Вгадав: обидва півфінали програють Франція та Англія → пара 3-го = Франція/Англія
+      const good=mk(); good['b_r4_0']={h:0,a:1}; good['b_r4_1']={h:0,a:1}; good['b_third_0']={h:2,a:1};
+      // Не вгадав: у слоті1 програє Аргентина → пара 3-го = Франція/Аргентина
+      const bad=mk();  bad['b_r4_0']={h:0,a:1};  bad['b_r4_1']={h:2,a:0};  bad['b_third_0']={h:2,a:1};
+      S.playoffSlots={'third_0':{home:'Франція',away:'Англія'}};
+      S.matches={'third_0':{h:2,a:1}};          // реальний матч за 3-є: Франція 2:1 Англія
+      S.participants=['Вгадав','НеВгадав'];
+      S.bonusRound={active:true, ptsScore:3, ptsResult:1, ptsDiff:2, rate:1,
+        predictions:{ 'Вгадав':{matches:good,playoffs:{},nominations:{}},
+                      'НеВгадав':{matches:bad,playoffs:{},nominations:{}} }};
+      // 1) сітка має містити пару 3-го місця
+      const slots=getBonusPredSlots(S.bonusRound.predictions['Вгадав']);
+      const r1=expect(slots.third&&slots.third[0]&&slots.third[0].home==='Франція'&&slots.third[0].away==='Англія',
+        'getBonusPredSlots має повертати third = Франція/Англія, отримано '+JSON.stringify(slots.third));
+      if(r1) return r1;
+      // 2) бали за точний рахунок нараховуються лише тому, хто вгадав пару
+      const bGood=calcPts('Вгадав').bonusDetail.bScorePts;
+      const bBad=calcPts('НеВгадав').bonusDetail.bScorePts;
+      const r2=expect(bGood===3, `Вгадав пару + точний 2:1 → 3 бали, отримав ${bGood}`);
+      if(r2) return r2;
+      return expect(bBad===0, `Не вгадав пару 3-го місця → 0 балів, отримав ${bBad}`);
     } finally { getRealR32Slots = _origR32; }
   });
 

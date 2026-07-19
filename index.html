@@ -6208,13 +6208,24 @@ function renderSummaryTable(){
       +'<span class="'+moneyCls(bal)+'" style="font-size:12px">'+money(bal)+'</span></td>';
   }
   const bonusCol=bonusActive?'<th class="r pool-col">🎯 Бонус<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>':'';
+  // «Перший прогноз» = все, що заповнювали до турніру: групи + плей-оф + номінації.
+  // Бонусний раунд — окрема пізніша подія, тому в цю суму НЕ входить.
+  const firstPts=row=>row.ptsGroup+(row.inP?row.ptsPlay:0)+(row.inN?row.ptsNom:0);
+  const firstBal=row=>(row.bd.group||0)+(row.bd.playoff||0)+(row.bd.noms||0);
   const body=rows.map((row,i)=>{
     const r=i+1,rc=r===1?'gold-rank':r===2?'silver-rank':r===3?'bronze-rank':'';
     const bonusCell=bonusActive?cell(row.inB,row.ptsBonus,row.bd.bonus):'';
+    const inFirst=row.inG||row.inP||row.inN;
+    const firstCell=inFirst
+      ? '<td class="r pool-col" style="background:rgba(255,255,255,.03)"><span style="font-weight:700">'+firstPts(row)+'</span>'
+        +'<span style="color:var(--muted)"> / </span>'
+        +'<span class="'+moneyCls(firstBal(row))+'" style="font-size:12px;font-weight:700">'+money(firstBal(row))+'</span></td>'
+      : '<td class="r pool-col" style="color:var(--muted);background:rgba(255,255,255,.03)">—</td>';
     return '<tr><td class="rank-cell '+rc+'">'+r+'</td><td class="name-cell">'+escapeHtml(row.n)+'</td>'
       +cell(row.inG,row.ptsGroup,row.bd.group)
       +cell(row.inP,row.ptsPlay,row.bd.playoff)
       +cell(row.inN,row.ptsNom,row.bd.noms)
+      +firstCell
       +bonusCell
       +'<td class="pts-cell">'+row.grandPts+'</td>'
       +'<td class="pool-col '+moneyCls(row.grandBal)+'" style="font-weight:700;font-variant-numeric:tabular-nums">'+money(row.grandBal)+'</td>'
@@ -6228,6 +6239,9 @@ function renderSummaryTable(){
   const bankPlay=bank(rows.map(r=>r.bd.playoff));
   const bankNoms=bank(rows.map(r=>r.bd.noms));
   const bankBonus=bank(rows.map(r=>r.bd.bonus));
+  // Банк «Разом» рахується по сумі НА ГРАВЦЯ, а не як bankGroup+bankPlay+bankNoms:
+  // та сума рахує обіг двічі, коли гравець в одній касі платить, а в іншій отримує.
+  const bankFirst=bank(rows.map(r=>firstBal(r)));
   // Клітинка під колонкою «Σ Баланс» = банк САМЕ ЦІЄЇ колонки, тобто скільки грошей
   // реально переходить з рук у руки за підсумком турніру (нетто-розрахунок).
   // НЕ сума банків кас: та сума рахує обіг двічі, коли гравець в одній касі платить,
@@ -6235,7 +6249,7 @@ function renderSummaryTable(){
   const bankTotal=bank(rows.map(r=>r.grandBal));
   const bankCell=v=>'<td class="r pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
   const bankCellR=v=>'<td class="pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
-  const footCols=bankCell(bankGroup)+bankCell(bankPlay)+bankCell(bankNoms)+(bonusActive?bankCell(bankBonus):'');
+  const footCols=bankCell(bankGroup)+bankCell(bankPlay)+bankCell(bankNoms)+bankCell(bankFirst)+(bonusActive?bankCell(bankBonus):'');
   const foot='<tfoot><tr style="border-top:2px solid var(--border)">'
     +'<td></td><td class="name-cell" style="color:var(--muted);font-size:13px;font-weight:700">💰 Загальна каса</td>'
     +footCols
@@ -6245,13 +6259,17 @@ function renderSummaryTable(){
 
   host.innerHTML='<div style="margin:.5rem 0 1rem">'
     +'<p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Зведення по всіх касах. Кожна каса — окремий zero-sum пул. «—» — гравець не бере участі в цій касі. Формат: <b style="color:var(--text)">очки / гроші</b>. Останній рядок — банк кожної каси (загальна каса).</p>'
-    +'<div class="scen-wrap"><table class="lb-table"><thead><tr>'
-    +'<th>#</th><th>Учасник</th>'
+    +'<div class="scen-wrap"><table class="lb-table"><thead>'
+    +'<tr>'
+    +'<th rowspan="2">#</th><th rowspan="2">Учасник</th>'
+    +'<th class="r pool-col" colspan="4" style="text-align:center;border-bottom:1px solid var(--border2);background:rgba(255,255,255,.03)">📋 Перший прогноз <span style="font-weight:400;color:var(--muted);font-size:10px">(до турніру)</span></th>'
+    +(bonusActive?'<th class="r pool-col" rowspan="2">🎯 Бонус<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>':'')
+    +'<th class="r" rowspan="2">Σ Очки</th><th class="r pool-col" rowspan="2">Σ Баланс</th>'
+    +'</tr><tr>'
     +'<th class="r pool-col">🥅 Групи<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
     +'<th class="r pool-col">🏟️ Плей-оф 1 етап<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
     +'<th class="r pool-col">🏅 Номінації<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
-    +bonusCol
-    +'<th class="r">Σ Очки</th><th class="r pool-col">Σ Баланс</th>'
+    +'<th class="r pool-col" style="background:rgba(255,255,255,.03)">Σ Разом<br><span style="display:block;font-weight:400;color:var(--muted);font-size:10px;margin-top:2px">очки / грн</span></th>'
     +'</tr></thead><tbody>'+body+'</tbody>'+foot+'</table></div></div>';
 }
 

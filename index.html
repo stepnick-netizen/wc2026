@@ -6222,12 +6222,17 @@ function renderSummaryTable(){
   }).join('');
 
   // ── Підсумковий рядок «Загальна каса»: банк кожної каси (сума додатних балансів) ──
+  // Кожна каса рахується ОКРЕМО як самостійний zero-sum пул.
   const bank=arr=>arr.reduce((s,v)=>s+(v>0?v:0),0);
   const bankGroup=bank(rows.map(r=>r.bd.group));
   const bankPlay=bank(rows.map(r=>r.bd.playoff));
   const bankNoms=bank(rows.map(r=>r.bd.noms));
   const bankBonus=bank(rows.map(r=>r.bd.bonus));
-  const bankTotal=bankGroup+bankPlay+bankNoms+bankBonus;
+  // Клітинка під колонкою «Σ Баланс» = банк САМЕ ЦІЄЇ колонки, тобто скільки грошей
+  // реально переходить з рук у руки за підсумком турніру (нетто-розрахунок).
+  // НЕ сума банків кас: та сума рахує обіг двічі, коли гравець в одній касі платить,
+  // а в іншій отримує, і як підсумок турніру нічого не означає.
+  const bankTotal=bank(rows.map(r=>r.grandBal));
   const bankCell=v=>'<td class="r pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
   const bankCellR=v=>'<td class="pool-col" style="font-family:\'Bebas Neue\';font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums">'+v+' '+code+'</td>';
   const footCols=bankCell(bankGroup)+bankCell(bankPlay)+bankCell(bankNoms)+(bonusActive?bankCell(bankBonus):'');

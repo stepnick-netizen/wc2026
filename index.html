@@ -1398,17 +1398,37 @@ function calcDetailedPts(name){
       }
     });
     if(round.id==='final'){
-      const cp=(pred.playoffs||{}).champion||'';
-      // Справжній чемпіон деривується з результату final_0
-      // (S.playoffTeams.champion ніде не присвоюється, тому покладатися на нього не можна)
+      const realName=t=>t&&!String(t).startsWith('Переможець')&&!String(t).startsWith('Пер.')
+        &&!String(t).startsWith('Матч')&&t!=='TBD'?String(t):'';
+      // Переможець пари за рахунком (нічия → ET/пенальті через res.winner)
+      const winnerOf=(slot,res)=>{
+        if(!slot||!res||res.h===''||res.h===undefined||res.a===''||res.a===undefined)return '';
+        const H=realName(slot.home),A=realName(slot.away);
+        if(!H||!A)return '';
+        if(+res.h>+res.a)return H;
+        if(+res.a>+res.h)return A;
+        const w=res.winner||'';
+        return (w===H||w===A)?w:'';
+      };
+      // ПРОГНОЗОВАНИЙ чемпіон: `pred.playoffs.champion` в основному прогнозі НІКОЛИ не
+      // зберігається (його пише лише бонус, ~рядок 4258), тому деривуємо переможця
+      // ВЛАСНОГО фіналу гравця — так само, як робляться бали за раунд вище.
+      let cp=(pred.playoffs||{}).champion||'';
+      if(!cp){
+        try{ cp=winnerOf(getPredSlotsForRound('final',pred)[0],(pred.matches||{})['final_0']); }catch(e){}
+      }
+      // РЕАЛЬНИЙ чемпіон: `S.playoffSlots['final_0']` адміном не заповнюється (у стані є
+      // лише r32_*/r16_*), тому основне джерело — getRealSlotsForRound('final'),
+      // як у бонусній гілці. playoffSlots лишається фолбеком.
       const realChamp=(()=>{
         const finRes=S.matches['final_0'];
         if(!finRes||finRes.h===''||finRes.h===undefined)return (S.playoffTeams||{}).champion||'';
-        const finSlot=(S.playoffSlots||{})['final_0']||{};
-        if(+finRes.h>+finRes.a)return finSlot.home||'';
-        if(+finRes.a>+finRes.h)return finSlot.away||'';
-        // нічия в основному → переможець з ET/пенальті
-        return finRes.winner||(S.playoffTeams||{}).champion||'';
+        let slot=(S.playoffSlots||{})['final_0']||{};
+        if(!realName(slot.home)||!realName(slot.away)){
+          try{ const rs=getRealSlotsForRound('final')[0];
+               if(rs)slot={home:realName(slot.home)||rs.home,away:realName(slot.away)||rs.away}; }catch(e){}
+        }
+        return winnerOf(slot,finRes)||finRes.winner||(S.playoffTeams||{}).champion||'';
       })();
       if(cp&&realChamp&&cp===realChamp)champ+=s.champ;
     }
@@ -5985,10 +6005,11 @@ function renderMainStageTable(){
   const code=curr.code||'UAH';
   const members=(S.participants||[]).filter(n=>{try{return inGroupPool(n)&&inPlayoffPool(n);}catch(e){return false;}});
   if(members.length===0){host.innerHTML='';return;}
-  // Очки основного етапу (без номінацій, без бонусу) = рахунки+групи+усі плей-оф раунди+чемпіон
-  const mainPts=p=>(p.matchPts||0)+(p.groupPts||0)+(p.r32||0)+(p.r16||0)+(p.r8||0)+(p.r4||0)+(p.fin||0)+(p.champ||0);
+  // Очки першого прогнозу (усе, що заповнювали до турніру; без бонусу)
+  // = рахунки + групи + усі плей-оф раунди + чемпіон + номінації.
+  const mainPts=p=>(p.matchPts||0)+(p.groupPts||0)+(p.r32||0)+(p.r16||0)+(p.r8||0)+(p.r4||0)+(p.fin||0)+(p.champ||0)+(p.nomPts||0);
   const rows=members.map(n=>{const d=calcPts(n);const bd=calcPoolBalanceBreakdown(n);
-    return {n, p:d, pts:mainPts(d), bal:(bd.group||0)+(bd.playoff||0)};})
+    return {n, p:d, pts:mainPts(d), bal:(bd.group||0)+(bd.playoff||0)+(bd.noms||0)};})
     .sort((a,b)=>b.pts-a.pts);
   let sumBal=0;
   const body=rows.map((row,i)=>{
@@ -6000,12 +6021,13 @@ function renderMainStageTable(){
       <td class="sub-cell">${p.r32||0}</td><td class="sub-cell">${p.r16||0}</td>
       <td class="sub-cell">${p.r8||0}</td><td class="sub-cell">${p.r4||0}</td>
       <td class="sub-cell">${p.fin||0}</td><td class="sub-cell">${p.champ||0}</td>
+      <td class="sub-cell">${p.nomPts||0}</td>
       <td class="pts-cell">${row.pts}</td>${balEl}</tr>`;
   }).join('');
   const sumCol=sumBal>=0?`<td class="uah-pos">+${sumBal} ${code}</td>`:`<td class="uah-neg">${sumBal} ${code}</td>`;
   host.innerHTML=`<div style="margin-top:2rem">
-    <div class="sec-title" style="font-size:18px">🎯 Основний етап <span style="font-size:13px;color:var(--muted);font-weight:400">(групи + плей-оф)</span></div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Учасники, що заповнили прогнози з початку турніру й до кінця (групи + повний плей-оф). ${members.length} уч.</p>
+    <div class="sec-title" style="font-size:18px">🎯 Основний етап <span style="font-size:13px;color:var(--muted);font-weight:400">(групи + плей-оф + номінації)</span></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Усе, що заповнювали <b style="color:var(--text)">до турніру</b> — групи, повний плей-оф і номінації (бонусний раунд сюди не входить). ${members.length} уч.</p>
     <div class="scen-wrap"><table class="lb-table">
       <thead><tr>
         <th>#</th><th>Учасник</th>
@@ -6013,16 +6035,17 @@ function renderMainStageTable(){
         <th class="r">1/16</th><th class="r">1/8</th>
         <th class="r">1/4</th><th class="r">1/2</th>
         <th class="r">Фінал</th><th class="r">Чемп.</th>
+        <th class="r">🏅 Номін.</th>
         <th class="r">Очки</th><th class="r">Баланс</th>
       </tr></thead>
       <tbody>${body}</tbody>
       <tfoot><tr style="border-top:2px solid var(--border2);font-weight:700">
         <td></td><td class="name-cell">Банк етапу</td>
-        <td class="sub-cell" colspan="8" style="color:var(--muted);text-align:right;font-weight:400;font-size:11px">сума балансів показаних учасників →</td>
+        <td class="sub-cell" colspan="9" style="color:var(--muted);text-align:right;font-weight:400;font-size:11px">сума балансів показаних учасників →</td>
         <td class="pts-cell"></td>${sumCol}
       </tr></tfoot>
     </table></div>
-    <p style="font-size:11px;color:var(--muted);margin-top:.5rem;line-height:1.5">Банк плей-оф каси завжди сходиться в 0. Групова складова може давати залишок, бо повна групова каса ширша за цю таблицю (включає тих, хто заповнив лише групи) — див. касу «Груповий етап» нижче.</p>
+    <p style="font-size:11px;color:var(--muted);margin-top:.5rem;line-height:1.5">Банк плей-оф каси завжди сходиться в 0. Групова складова та номінації можуть давати залишок, бо ці каси ширші за цю таблицю (включають тих, хто заповнив лише групи або лише номінації) — див. окремі каси нижче.</p>
   </div>`;
 }
 
@@ -6111,7 +6134,8 @@ function renderPoolTables(){
     let infoBlock='';
     if(poMode){
       infoBlock='<div style="font-size:11px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;margin-bottom:1rem;line-height:1.6">'
-        +'<b style="color:var(--text)">Рахунок / Різниця / Результат</b> — кількість вгаданого в матчах плей-оф (рахується, тільки якщо вгадано пару в сітці; <b style="color:var(--text)">×'+s.exact+' / ×'+s.diff+' / ×'+s.result+'</b> очок). '
+        +'<b style="color:var(--text)">Рахунок / Різниця / Результат</b> — кількість вгаданого в матчах плей-оф (рахується, тільки якщо вгадано пару в сітці; <b style="color:var(--text)">×'+s.exact+' / ×'+(s.diff+s.result)+' / ×'+s.result+'</b> очок). '
+        +'<span style="color:var(--muted)">Влучена різниця голів дає і бал за результат, тому коштує '+(s.diff+s.result)+', а не '+s.diff+'.</span> '
         +'Далі — <b style="color:var(--text)">очки за раунд</b> (бал за кожну команду, що реально вийшла в цей раунд): '
         +'<b style="color:var(--text)">1/16 ×'+s.r32+'</b> · <b style="color:var(--text)">1/8 ×'+s.r16+'</b> · <b style="color:var(--text)">1/4 ×'+s.r8+'</b> · '
         +'<b style="color:var(--text)">1/2 ×'+s.r4+'</b> · <b style="color:var(--text)">Фінал ×'+s.final+'</b> · <b style="color:var(--text)">Чемпіон ×'+s.champ+'</b>. '
@@ -8463,6 +8487,44 @@ function runTests() {
       if(r2) return r2;
       return expect(bBad===0, `Не вгадав пару 3-го місця → 0 балів, отримав ${bBad}`);
     } finally { getRealR32Slots = _origR32; }
+  });
+
+  // ── Test 16 ────────────────────────────────────────────────────────
+  // Чемпіон (основний прогноз): бали мають нараховуватись БЕЗ `pred.playoffs.champion`
+  // і БЕЗ `S.playoffSlots['final_0']` — обидва в реальному житті не заповнюються.
+  // ЛОВИТЬ БАГ: колонка «Чемп.» була порожня у всіх, бо `cp` брався лише з
+  // pred.playoffs.champion (його пише тільки бонус), а реальний чемпіон — лише
+  // з S.playoffSlots['final_0'] (адмін його не заповнює; у стані є лише r32_*/r16_*).
+  test('16. Чемпіон — бали без playoffs.champion і без playoffSlots', () => {
+    S = baseState();
+    const _origR32 = getRealR32Slots, _origReal = getRealSlotsForRound, _origPred = getPredSlotsForRound;
+    try {
+      // Реальний фінал: Іспанія vs Бразилія, Іспанія виграє 1:0.
+      getRealSlotsForRound = function(rid){
+        if(rid==='final')return [{id:'final_0',n:1,home:'Іспанія',away:'Бразилія'}];
+        return [];
+      };
+      // Сітки гравців: у «Вгадав» фінал Іспанія-Бразилія 2:1 (чемпіон Іспанія),
+      // у «Мимо» — той самий фінал, але 0:1 (чемпіон Бразилія).
+      getPredSlotsForRound = function(rid,pred){
+        if(rid==='final')return [{id:'final_0',n:1,home:'Іспанія',away:'Бразилія'}];
+        return [];
+      };
+      S.playoffSlots = {};                       // final_0 НЕ заповнений — як у реальному стані
+      S.matches = {'final_0':{h:1,a:0}};          // Іспанія чемпіон
+      S.participants = ['Вгадав','Мимо'];
+      S.predictions = {
+        // playoffs НАВМИСНО порожній — саме так зберігається основний прогноз
+        'Вгадав':{matches:{'final_0':{h:2,a:1},'third_0':{h:1,a:0}},playoffs:{},nominations:{}},
+        'Мимо'  :{matches:{'final_0':{h:0,a:1},'third_0':{h:1,a:0}},playoffs:{},nominations:{}}
+      };
+      const cGood=calcPts('Вгадав').champ, cBad=calcPts('Мимо').champ;
+      const r1=expect(cGood===S.scoring.champ, `Вгадав чемпіона → ${S.scoring.champ} балів, отримав ${cGood}`);
+      if(r1) return r1;
+      return expect(cBad===0, `Не вгадав чемпіона → 0 балів, отримав ${cBad}`);
+    } finally {
+      getRealR32Slots=_origR32; getRealSlotsForRound=_origReal; getPredSlotsForRound=_origPred;
+    }
   });
 
   // ── RENDER RESULTS ─────────────────────────────────────────────────
